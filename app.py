@@ -313,6 +313,319 @@ def test_als_isbn_consistency(raw_csv_path, mapping_csv_path, model_order_list_c
     else:
         return False, "No common ALDS subscription product ISBN found in all files"
 
+def run_all_tests(mapping_csv_path, model_order_list_csv_path):
+    """
+    Run comprehensive validation tests on the processed order list.
+    Returns: list of test results, each with {name, passed, message, details}
+    """
+    results = []
+
+    # Load the files
+    try:
+        mapping_df = pd.read_csv(mapping_csv_path, encoding='utf-8-sig')
+        order_df = pd.read_csv(model_order_list_csv_path, encoding='utf-8-sig')
+    except Exception as e:
+        return [{
+            "name": "File Loading",
+            "passed": False,
+            "message": f"Could not load files for testing: {str(e)}",
+            "details": ["Ensure files have been processed before running tests"]
+        }]
+
+    if len(order_df) == 0:
+        return [{
+            "name": "File Loading",
+            "passed": False,
+            "message": "Order list is empty - no data to test",
+            "details": ["Process files first to generate the order list"]
+        }]
+
+    # === TEST 1: ActiveHub Package Check ===
+    # Check Pack ID in order list matches Pack ID in mapping CSV
+    test1_details = []
+    test1_passed = True
+    test1_mismatches = 0
+
+    try:
+        # Check if required columns exist
+        order_pack_col = "AH Package 1" if "AH Package 1" in order_df.columns else None
+        mapping_pack_col = "AH Sub 1 Package" if "AH Sub 1 Package" in mapping_df.columns else None
+        isbn_col = "ALDS subscription product ISBN"
+
+        if not order_pack_col:
+            test1_passed = False
+            test1_details.append("Order list missing 'AH Package 1' column")
+        elif not mapping_pack_col:
+            test1_passed = False
+            test1_details.append("Mapping file missing 'AH Sub 1 Package' column")
+        elif isbn_col not in order_df.columns or isbn_col not in mapping_df.columns:
+            test1_passed = False
+            test1_details.append(f"Missing '{isbn_col}' column for matching")
+        else:
+            # Create mapping lookup
+            mapping_lookup = mapping_df.set_index(isbn_col)[mapping_pack_col].to_dict()
+
+            for idx, row in order_df.iterrows():
+                order_isbn = str(row.get(isbn_col, "")).strip()
+                order_pack = str(row.get(order_pack_col, "")).strip()
+                expected_pack = str(mapping_lookup.get(order_isbn, "")).strip()
+
+                if order_isbn and expected_pack and order_pack != expected_pack:
+                    test1_mismatches += 1
+                    if test1_mismatches <= 5:  # Show first 5 mismatches
+                        test1_details.append(f"Row {idx+2}: ISBN {order_isbn} has Pack '{order_pack}' but expected '{expected_pack}'")
+
+            if test1_mismatches > 0:
+                test1_passed = False
+                test1_details.insert(0, f"Found {test1_mismatches} Pack ID mismatches")
+                if test1_mismatches > 5:
+                    test1_details.append(f"...and {test1_mismatches - 5} more mismatches")
+            else:
+                test1_details.append(f"All {len(order_df)} orders have correct Pack IDs")
+    except Exception as e:
+        test1_passed = False
+        test1_details.append(f"Error during test: {str(e)}")
+
+    results.append({
+        "name": "ActiveHub Package Check",
+        "passed": test1_passed,
+        "message": "Pack IDs match mapping data" if test1_passed else "Pack ID mismatches found",
+        "details": test1_details
+    })
+
+    # === TEST 2: ActiveHub Subject/SKU Check ===
+    # Check SKU name and number match between order list and mapping
+    test2_details = []
+    test2_passed = True
+    test2_mismatches = 0
+
+    try:
+        isbn_col = "ALDS subscription product ISBN"
+        # Check for SKU columns (handle different capitalizations)
+        order_sku_col = None
+        mapping_sku_col = None
+
+        for col in ["AH SKU 1", "AH Sku 1"]:
+            if col in order_df.columns:
+                order_sku_col = col
+                break
+
+        for col in ["AH Sub 1 SKU"]:
+            if col in mapping_df.columns:
+                mapping_sku_col = col
+                break
+
+        # SKU name columns
+        order_sku_name_col = None
+        mapping_sku_name_col = None
+
+        for col in ["AH SKU name", "AH Sku name"]:
+            if col in order_df.columns:
+                order_sku_name_col = col
+                break
+
+        for col in ["AH SKU name", "AH Sku name"]:
+            if col in mapping_df.columns:
+                mapping_sku_name_col = col
+                break
+
+        if not order_sku_col:
+            test2_passed = False
+            test2_details.append("Order list missing SKU ID column (AH SKU 1)")
+        elif not mapping_sku_col:
+            test2_passed = False
+            test2_details.append("Mapping file missing SKU column (AH Sub 1 SKU)")
+        else:
+            # Create mapping lookups
+            mapping_sku_lookup = mapping_df.set_index(isbn_col)[mapping_sku_col].to_dict()
+            mapping_sku_name_lookup = {}
+            if mapping_sku_name_col:
+                mapping_sku_name_lookup = mapping_df.set_index(isbn_col)[mapping_sku_name_col].to_dict()
+
+            for idx, row in order_df.iterrows():
+                order_isbn = str(row.get(isbn_col, "")).strip()
+                order_sku = str(row.get(order_sku_col, "")).strip()
+                expected_sku = str(mapping_sku_lookup.get(order_isbn, "")).strip()
+
+                if order_isbn and expected_sku and order_sku != expected_sku:
+                    test2_mismatches += 1
+                    if test2_mismatches <= 5:
+                        test2_details.append(f"Row {idx+2}: ISBN {order_isbn} has SKU '{order_sku}' but expected '{expected_sku}'")
+
+                # Also check SKU name if available
+                if order_sku_name_col and mapping_sku_name_col:
+                    order_sku_name = str(row.get(order_sku_name_col, "")).strip()
+                    expected_sku_name = str(mapping_sku_name_lookup.get(order_isbn, "")).strip()
+                    if order_isbn and expected_sku_name and order_sku_name != expected_sku_name:
+                        test2_mismatches += 1
+                        if test2_mismatches <= 5:
+                            test2_details.append(f"Row {idx+2}: SKU name mismatch - got '{order_sku_name}', expected '{expected_sku_name}'")
+
+            if test2_mismatches > 0:
+                test2_passed = False
+                test2_details.insert(0, f"Found {test2_mismatches} SKU mismatches")
+                if test2_mismatches > 5:
+                    test2_details.append(f"...and {test2_mismatches - 5} more mismatches")
+            else:
+                test2_details.append(f"All {len(order_df)} orders have correct SKU IDs and names")
+    except Exception as e:
+        test2_passed = False
+        test2_details.append(f"Error during test: {str(e)}")
+
+    results.append({
+        "name": "ActiveHub Subject/SKU Check",
+        "passed": test2_passed,
+        "message": "SKU IDs and names match mapping data" if test2_passed else "SKU mismatches found",
+        "details": test2_details
+    })
+
+    # === TEST 3: Pack ID and SKU ID Populated Check ===
+    # Ensure SKU codes are populated in the order list
+    test3_details = []
+    test3_passed = True
+    missing_pack = 0
+    missing_sku = 0
+
+    try:
+        pack_col = "AH Package 1" if "AH Package 1" in order_df.columns else None
+        sku_col = None
+        for col in ["AH SKU 1", "AH Sku 1"]:
+            if col in order_df.columns:
+                sku_col = col
+                break
+
+        if not pack_col:
+            test3_details.append("Warning: 'AH Package 1' column not found")
+        if not sku_col:
+            test3_details.append("Warning: 'AH SKU 1' column not found")
+
+        if pack_col:
+            missing_pack = order_df[pack_col].isna().sum() + (order_df[pack_col].astype(str).str.strip() == "").sum()
+        if sku_col:
+            missing_sku = order_df[sku_col].isna().sum() + (order_df[sku_col].astype(str).str.strip() == "").sum()
+
+        if missing_pack > 0:
+            test3_passed = False
+            test3_details.append(f"{missing_pack} orders have empty Pack ID")
+        else:
+            test3_details.append(f"All {len(order_df)} orders have Pack ID populated")
+
+        if missing_sku > 0:
+            test3_passed = False
+            test3_details.append(f"{missing_sku} orders have empty SKU ID")
+        else:
+            test3_details.append(f"All {len(order_df)} orders have SKU ID populated")
+
+    except Exception as e:
+        test3_passed = False
+        test3_details.append(f"Error during test: {str(e)}")
+
+    results.append({
+        "name": "Pack ID and SKU ID Populated",
+        "passed": test3_passed,
+        "message": "All required codes are populated" if test3_passed else "Some orders missing Pack ID or SKU ID",
+        "details": test3_details
+    })
+
+    # === TEST 4: Email Validation (ends with 1 or 2) ===
+    # Emails ending with 1 or 2 will fail
+    test4_details = []
+    test4_passed = True
+    problem_emails = []
+
+    try:
+        if "Email" not in order_df.columns:
+            test4_passed = False
+            test4_details.append("Email column not found in order list")
+        else:
+            for idx, row in order_df.iterrows():
+                email = str(row.get("Email", "")).strip()
+                # Check if email ends with 1 or 2 (before @domain or at the very end of local part)
+                if email:
+                    local_part = email.split("@")[0] if "@" in email else email
+                    if local_part.endswith("1") or local_part.endswith("2"):
+                        problem_emails.append((idx + 2, email))
+
+            if problem_emails:
+                test4_passed = False
+                test4_details.append(f"Found {len(problem_emails)} emails ending with 1 or 2 (these orders will fail)")
+                for row_num, email in problem_emails[:5]:
+                    test4_details.append(f"Row {row_num}: {email}")
+                if len(problem_emails) > 5:
+                    test4_details.append(f"...and {len(problem_emails) - 5} more problem emails")
+            else:
+                test4_details.append(f"All {len(order_df)} emails passed validation")
+    except Exception as e:
+        test4_passed = False
+        test4_details.append(f"Error during test: {str(e)}")
+
+    results.append({
+        "name": "Email Validation",
+        "passed": test4_passed,
+        "message": "All emails are valid" if test4_passed else f"{len(problem_emails)} emails will cause order failures",
+        "details": test4_details
+    })
+
+    # === TEST 5: Price Consistency Check ===
+    # Check order list price matches mapping list price
+    test5_details = []
+    test5_passed = True
+    price_mismatches = 0
+
+    try:
+        isbn_col = "ALDS subscription product ISBN"
+        order_price_col = "AH Line 1 Price" if "AH Line 1 Price" in order_df.columns else None
+        mapping_price_col = "ISBN ExVAT List Price" if "ISBN ExVAT List Price" in mapping_df.columns else None
+
+        if not order_price_col:
+            test5_passed = False
+            test5_details.append("Order list missing 'AH Line 1 Price' column")
+        elif not mapping_price_col:
+            test5_passed = False
+            test5_details.append("Mapping file missing 'ISBN ExVAT List Price' column")
+        elif isbn_col not in mapping_df.columns:
+            test5_passed = False
+            test5_details.append(f"Mapping file missing '{isbn_col}' column")
+        else:
+            # Create price lookup
+            mapping_price_lookup = mapping_df.set_index(isbn_col)[mapping_price_col].to_dict()
+
+            for idx, row in order_df.iterrows():
+                order_isbn = str(row.get(isbn_col, "")).strip()
+
+                try:
+                    order_price = float(row.get(order_price_col, 0)) if pd.notna(row.get(order_price_col)) else None
+                    expected_price = float(mapping_price_lookup.get(order_isbn, 0)) if order_isbn in mapping_price_lookup else None
+
+                    if order_price is not None and expected_price is not None:
+                        # Compare with tolerance for floating point
+                        if abs(order_price - expected_price) > 0.01:
+                            price_mismatches += 1
+                            if price_mismatches <= 5:
+                                test5_details.append(f"Row {idx+2}: ISBN {order_isbn} has price {order_price:.2f} but expected {expected_price:.2f}")
+                except (ValueError, TypeError):
+                    pass  # Skip rows with non-numeric prices
+
+            if price_mismatches > 0:
+                test5_passed = False
+                test5_details.insert(0, f"Found {price_mismatches} price mismatches")
+                if price_mismatches > 5:
+                    test5_details.append(f"...and {price_mismatches - 5} more mismatches")
+            else:
+                test5_details.append(f"All {len(order_df)} orders have correct prices")
+    except Exception as e:
+        test5_passed = False
+        test5_details.append(f"Error during test: {str(e)}")
+
+    results.append({
+        "name": "Price Consistency Check",
+        "passed": test5_passed,
+        "message": "All prices match mapping data" if test5_passed else "Price mismatches found",
+        "details": test5_details
+    })
+
+    return results
+
 def process_chunk(chunk_df, mapping_df, chunk_num):
     """
     Process a single chunk of raw data.
@@ -735,12 +1048,48 @@ def download_grouped():
 
 @app.route("/test_als_isbn")
 def test_als_isbn_ui():
-    """Test ISBN consistency across files."""
+    """Run comprehensive validation tests on processed data."""
     raw_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], "raw_data.csv")
     mapping_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], "example_mapping.csv")
-    
-    result, message = test_als_isbn_consistency(raw_csv_path, mapping_csv_path, model_order_list_path)
-    return render_template("test_results.html", result=result, message=message)
+
+    # Check if files exist
+    if not os.path.exists(model_order_list_path):
+        return render_template("test_results.html",
+                               test_results=[],
+                               overall_passed=False,
+                               error_message="No processed data found. Please upload and process files first.")
+
+    if not os.path.exists(mapping_csv_path):
+        return render_template("test_results.html",
+                               test_results=[],
+                               overall_passed=False,
+                               error_message="Mapping file not found. Please upload files first.")
+
+    # Run ISBN consistency test (legacy)
+    isbn_result, isbn_message = test_als_isbn_consistency(raw_csv_path, mapping_csv_path, model_order_list_path)
+
+    # Run comprehensive tests
+    test_results = run_all_tests(mapping_csv_path, model_order_list_path)
+
+    # Add ISBN test as first test
+    test_results.insert(0, {
+        "name": "ISBN Consistency Check",
+        "passed": isbn_result,
+        "message": isbn_message,
+        "details": ["Verifies ISBNs match across Raw Data, Mapping, and Output files"]
+    })
+
+    # Calculate overall result
+    overall_passed = all(test["passed"] for test in test_results)
+    passed_count = sum(1 for test in test_results if test["passed"])
+    failed_count = len(test_results) - passed_count
+
+    return render_template("test_results.html",
+                           test_results=test_results,
+                           overall_passed=overall_passed,
+                           passed_count=passed_count,
+                           failed_count=failed_count,
+                           error_message=None)
 
 @app.route("/debug_columns")
 def debug_columns():
