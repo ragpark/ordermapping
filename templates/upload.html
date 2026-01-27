@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Mapping Tool - Upload Files</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border-left: 4px solid;
+        }
+        
+        .alert-warning {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+        
+        .alert-info {
+            background-color: #e7f3ff;
+            border-left-color: #007bff;
+            color: #004085;
+        }
+        
+        .requirements {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .requirements h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .requirements ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .requirements li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e9ecef;
+            position: relative;
+            padding-left: 25px;
+        }
+        
+        .requirements li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .requirements li:last-child {
+            border-bottom: none;
+        }
+        
+        .requirements li strong {
+            color: #495057;
+            display: block;
+            margin-bottom: 3px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+        
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #cbd3da;
+            border-radius: 8px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .form-group input[type="file"]:hover {
+            border-color: #667eea;
+            background: #e7f3ff;
+        }
+        
+        .form-group input[type="file"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .file-info {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .submit-container {
+            text-align: center;
+            padding: 30px 0;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .submit-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .processing {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Order Mapping Tool</h1>
+            <p>Process ALS to AH subscription mappings with data validation</p>
+        </div>
+        
+        <div class="content">
+            <div class="alert alert-warning">
+                <strong>Railway Deployment Notice:</strong> Files are stored temporarily and cleared between deployments. Download your processed results immediately after completion.
+            </div>
+            
+            <div class="requirements">
+                <h3>📋 File Requirements</h3>
+                <ul>
+                    <li>
+                        <strong>Raw Data CSV (Required)</strong>
+                        Must contain: ISBN, Sub ID, School key, School name, Customer name, Email, Postcode, Address, End date
+                    </li>
+                    <li>
+                        <strong>Mapping CSV (Required)</strong>
+                        Must contain: ALDS subscription product ISBN, product details, AH Sub codes, pricing information
+                    </li>
+                    <li>
+                        <strong>Exclude CSV (Optional)</strong>
+                        Contains Sub ID, School key, ISBN, or ALDS subscription product ISBN to exclude from processing
+                    </li>
+                </ul>
+            </div>
+            
+            <form id="uploadForm" method="post" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="raw_data">📊 Raw Data CSV File</label>
+                    <input type="file" name="raw_data" id="raw_data" accept=".csv" required>
+                    <div class="file-info">Select the main subscription data file for processing</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="mapping_data">🔗 Mapping CSV File</label>
+                    <input type="file" name="mapping_data" id="mapping_data" accept=".csv" required>
+                    <div class="file-info">Select the file that maps ISBNs to product information</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="exclude_data">🚫 Exclude CSV File (Optional)</label>
+                    <input type="file" name="exclude_data" id="exclude_data" accept=".csv">
+                    <div class="file-info">Optional file containing IDs to exclude from processing</div>
+                </div>
+                
+                <div class="submit-container">
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        🚀 Process Files
+                    </button>
+                </div>
+                
+                <div class="processing" id="processing">
+                    <div class="spinner"></div>
+                    <h3>Processing your files...</h3>
+                    <p>This may take several minutes for large files. Please wait.</p>
+                </div>
+            </form>
+        </div>
+        
+        <div class="footer">
+            Pearson Order Mapping Tool • Railway Deployment • 
+            <a href="/debug_columns" style="color: #667eea;">Debug Info</a> • 
+            <a href="/health" style="color: #667eea;">System Health</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            const rawFile = document.getElementById('raw_data').files[0];
+            const mappingFile = document.getElementById('mapping_data').files[0];
+            
+            if (!rawFile || !mappingFile) {
+                e.preventDefault();
+                alert('Please select both Raw Data and Mapping CSV files.');
+                return;
+            }
+            
+            // Check file sizes (100MB limit)
+            const maxSize = 100 * 1024 * 1024; // 100MB
+            if (rawFile.size > maxSize || mappingFile.size > maxSize) {
+                e.preventDefault();
+                alert('Files must be smaller than 100MB. Please split large files and try again.');
+                return;
+            }
+            
+            // Show processing indicator
+            document.getElementById('submitBtn').style.display = 'none';
+            document.getElementById('processing').style.display = 'block';
+            document.getElementById('submitBtn').disabled = true;
+        });
+        
+        // File input change handlers for better UX
+        document.querySelectorAll('input[type="file"]').forEach(input => {
+            input.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+                    const infoDiv = this.nextElementSibling;
+                    infoDiv.innerHTML = `Selected: ${file.name} (${sizeInMB} MB)`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
