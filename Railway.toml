@@ -2,10 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-healthcheckPath = "/"
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"
-
-[env]
-PORT = "8080"
-FLASK_ENV = "production"
+numReplicas = 1
