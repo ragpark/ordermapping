@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Mapping Tool - ISBN Test Results</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .test-result {
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            border: 2px solid;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .test-result::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: left 0.5s;
+        }
+        
+        .test-result:hover::before {
+            left: 100%;
+        }
+        
+        .success {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border-color: #28a745;
+            color: #155724;
+        }
+        
+        .error {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        
+        .test-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            display: block;
+        }
+        
+        .test-result h3 {
+            font-size: 2em;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .test-message {
+            font-size: 1.2em;
+            line-height: 1.5;
+            background: rgba(255,255,255,0.7);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .test-details {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .test-details h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+        }
+        
+        .test-details-icon {
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        
+        .test-details ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .test-details li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+            position: relative;
+            padding-left: 25px;
+        }
+        
+        .test-details li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 1.5em;
+        }
+        
+        .test-details li:last-child {
+            border-bottom: none;
+        }
+        
+        .test-description {
+            background: linear-gradient(135deg, #e7f3ff, #cce7ff);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .test-description h4 {
+            color: #004085;
+            margin-bottom: 10px;
+        }
+        
+        .test-description p {
+            color: #004085;
+            margin: 0;
+            line-height: 1.6;
+        }
+        
+        .nav-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 20px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+            text-decoration: none;
+            color: white;
+        }
+        
+        .nav-btn.secondary {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+        
+        .nav-btn.secondary:hover {
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.5);
+        }
+        
+        .btn-icon {
+            font-size: 1.2em;
+            margin-right: 10px;
+        }
+        
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 20px 40px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .test-result {
+                padding: 20px;
+            }
+            
+            .test-icon {
+                font-size: 3em;
+            }
+            
+            .test-result h3 {
+                font-size: 1.5em;
+            }
+            
+            .nav-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 ISBN Consistency Test</h1>
+            <p>Verification of ISBN mapping across all uploaded files</p>
+        </div>
+        
+        <div class="content">
+            <div class="test-description">
+                <h4>🔍 What This Test Checks</h4>
+                <p>
+                    This test verifies that ISBNs can be successfully matched between your Raw Data file, 
+                    Mapping file, and processed output. It ensures the mapping process worked correctly 
+                    and that product information is properly linked.
+                </p>
+            </div>
+            
+            {% if result %}
+                <div class="test-result success">
+                    <span class="test-icon">✅</span>
+                    <h3>Test Passed</h3>
+                    <div class="test-message">{{ message }}</div>
+                </div>
+                
+                <div class="test-details">
+                    <h4><span class="test-details-icon">✅</span>Success Details</h4>
+                    <ul>
+                        <li>ISBN format consistency verified across all files</li>
+                        <li>Mapping relationships successfully established</li>
+                        <li>Product information properly linked</li>
+                        <li>Data integrity maintained throughout processing</li>
+                    </ul>
+                </div>
+            {% else %}
+                <div class="test-result error">
+                    <span class="test-icon">❌</span>
+                    <h3>Test Failed</h3>
+                    <div class="test-message">{{ message }}</div>
+                </div>
+                
+                <div class="test-details">
+                    <h4><span class="test-details-icon">🛠️</span>Troubleshooting Steps</h4>
+                    <ul>
+                        <li>Verify ISBN column exists in your Raw Data file</li>
+                        <li>Check that "ALDS subscription product ISBN" column exists in Mapping file</li>
+                        <li>Ensure ISBN formats match between files (check for leading zeros or formatting differences)</li>
+                        <li>Confirm the files have been processed successfully before running this test</li>
+                        <li>Check debug information using the Debug Column Info button below</li>
+                    </ul>
+                </div>
+            {% endif %}
+            
+            <div class="nav-section">
+                <a href="/" class="nav-btn">
+                    <span class="btn-icon">🏠</span>
+                    Back to Upload
+                </a>
+                <a href="/debug_columns" class="nav-btn secondary">
+                    <span class="btn-icon">🔍</span>
+                    Debug Column Info
+                </a>
+                {% if result %}
+                <a href="/download_valid" class="nav-btn secondary">
+                    <span class="btn-icon">📥</span>
+                    Download Results
+                </a>
+                {% endif %}
+                <a href="/health" class="nav-btn secondary">
+                    <span class="btn-icon">❤️</span>
+                    System Health
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Test completed at <span id="test-time"></span> • 
+            Pearson Order Mapping Tool • Railway Deployment
+        </div>
+    </div>
+
+    <script>
+        // Display current time
+        document.getElementById('test-time').textContent = 
+            new Date().toLocaleString('en-GB', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        
+        // Add animation to test result on page load
+        window.addEventListener('load', function() {
+            const testResult = document.querySelector('.test-result');
+            if (testResult) {
+                testResult.style.opacity = '0';
+                testResult.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    testResult.style.transition = 'all 0.5s ease';
+                    testResult.style.opacity = '1';
+                    testResult.style.transform = 'translateY(0)';
+                }, 100);
+            }
+        });
+        
+        // Add click feedback to navigation buttons
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                // Visual feedback
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = '';
+                }, 150);
+            });
+        });
+        
+        // Auto-refresh functionality for failed tests (optional)
+        {% if not result %}
+        let refreshTimer;
+        function startRefreshTimer() {
+            refreshTimer = setTimeout(() => {
+                if (confirm('Would you like to re-run the ISBN consistency test?')) {
+                    window.location.reload();
+                }
+            }, 30000); // 30 seconds
+        }
+        
+        // Uncomment the next line to enable auto-refresh prompt
+        // startRefreshTimer();
+        {% endif %}
+    </script>
+</body>
+</html>
