@@ -100,6 +100,76 @@ def row_invalid(row):
     
     return False
 
+def validate_csv_file(file_path, file_description="file"):
+    """
+    Validate that a CSV file exists, is not empty, and has a valid structure.
+    Returns: (success: bool, error_message: str or None, dataframe: pd.DataFrame or None)
+    """
+    import os
+
+    # Check file exists
+    if not os.path.exists(file_path):
+        return False, f"{file_description} not found at {file_path}", None
+
+    # Check file is not empty
+    file_size = os.path.getsize(file_path)
+    if file_size == 0:
+        return False, f"{file_description} is empty (0 bytes). Please upload a valid CSV file.", None
+
+    # Try to read with multiple encodings
+    encodings_to_try = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252']
+    last_error = None
+
+    for encoding in encodings_to_try:
+        try:
+            # Try to read just the header and first few rows
+            df = pd.read_csv(file_path, encoding=encoding, nrows=5)
+
+            # Check if we got any columns
+            if len(df.columns) == 0:
+                return False, f"{file_description} has no columns. The file may not be a valid CSV format.", None
+
+            # Check for unnamed columns (often indicates wrong delimiter)
+            unnamed_cols = [col for col in df.columns if str(col).startswith('Unnamed:')]
+            if len(unnamed_cols) == len(df.columns):
+                return False, f"{file_description} appears to have no header row or uses an incorrect delimiter.", None
+
+            logging.info(f"Successfully validated {file_description} with encoding '{encoding}'. Columns: {df.columns.tolist()[:5]}...")
+            return True, None, df
+
+        except pd.errors.EmptyDataError:
+            return False, f"{file_description} contains no data. The file may be empty or contain only whitespace.", None
+        except pd.errors.ParserError as e:
+            last_error = f"{file_description} could not be parsed as CSV: {str(e)}"
+            continue
+        except UnicodeDecodeError:
+            last_error = f"{file_description} encoding issue"
+            continue
+        except Exception as e:
+            last_error = f"{file_description} error: {str(e)}"
+            continue
+
+    return False, f"{file_description} could not be read with any supported encoding (tried: {', '.join(encodings_to_try)}). Last error: {last_error}", None
+
+def read_csv_with_fallback(file_path, file_description="file", **kwargs):
+    """
+    Read a CSV file, trying multiple encodings if needed.
+    Returns the DataFrame or raises an exception with a helpful message.
+    """
+    encodings_to_try = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252']
+    last_error = None
+
+    for encoding in encodings_to_try:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding, **kwargs)
+            logging.info(f"Successfully read {file_description} with encoding '{encoding}'")
+            return df
+        except (UnicodeDecodeError, pd.errors.ParserError) as e:
+            last_error = str(e)
+            continue
+
+    raise ValueError(f"Could not read {file_description} with any supported encoding. Last error: {last_error}")
+
 def apply_exclusions(model_order_list_df, exclude_csv_path):
     """
     Remove rows that match IDs in the Exclude.csv file.
@@ -381,16 +451,40 @@ def process_files_chunked(raw_file_path, mapping_df, exclude_csv_path=None):
         # Get total rows for progress tracking
         total_rows = sum(1 for _ in open(raw_file_path, encoding='latin1')) - 1  # Subtract header
         logging.info(f"Processing {total_rows} total rows in chunks of {CHUNK_SIZE}")
-        
+
+        if total_rows <= 0:
+            raise ValueError("Raw Data file contains no data rows. Please upload a file with at least one data row.")
+
         # Initialize result lists
         valid_chunks = []
         exception_chunks = []
-        
+
         chunk_num = 0
-        
-        # Process file in chunks
-        # Use utf-8-sig to automatically strip BOM (Byte Order Mark)
-        for chunk_df in pd.read_csv(raw_file_path, encoding='utf-8-sig', chunksize=CHUNK_SIZE, low_memory=False):
+
+        # Try multiple encodings for reading raw file
+        encodings_to_try = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252']
+        successful_encoding = None
+        last_error = None
+
+        for encoding in encodings_to_try:
+            try:
+                # Test reading first chunk with this encoding
+                test_reader = pd.read_csv(raw_file_path, encoding=encoding, chunksize=CHUNK_SIZE, low_memory=False)
+                test_chunk = next(test_reader)
+                if len(test_chunk.columns) == 0:
+                    continue
+                successful_encoding = encoding
+                logging.info(f"Successfully reading Raw Data file with encoding '{encoding}'")
+                break
+            except (UnicodeDecodeError, pd.errors.ParserError, StopIteration) as e:
+                last_error = str(e)
+                continue
+
+        if successful_encoding is None:
+            raise ValueError(f"Could not read Raw Data file with any supported encoding (tried: {', '.join(encodings_to_try)}). Last error: {last_error}")
+
+        # Process file in chunks with the successful encoding
+        for chunk_df in pd.read_csv(raw_file_path, encoding=successful_encoding, chunksize=CHUNK_SIZE, low_memory=False):
             chunk_num += 1
             
             # Process this chunk
@@ -448,33 +542,72 @@ def health_check():
 def upload_files():
     if request.method == "POST":
         try:
-            # Validate file uploads
+            # Validate file uploads exist in request
             if "raw_data" not in request.files or "mapping_data" not in request.files:
-                return "Missing file upload", 400
+                return "Missing file upload. Please select both Raw Data and Mapping Data files.", 400
 
             raw_file = request.files["raw_data"]
             mapping_file = request.files["mapping_data"]
             exclude_file = request.files.get("exclude_data")
 
             if not raw_file.filename or not mapping_file.filename:
-                return "No file selected", 400
+                return "No file selected. Please select both Raw Data and Mapping Data files.", 400
+
+            # Check file extensions
+            if not raw_file.filename.lower().endswith('.csv'):
+                return f"Raw Data file must be a CSV file. Received: {raw_file.filename}", 400
+            if not mapping_file.filename.lower().endswith('.csv'):
+                return f"Mapping Data file must be a CSV file. Received: {mapping_file.filename}", 400
 
             # Save uploaded files
             raw_file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename("raw_data.csv"))
             mapping_file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename("example_mapping.csv"))
             exclude_csv_path = None
-            
+
             raw_file.save(raw_file_path)
             mapping_file.save(mapping_file_path)
-            
+
             if exclude_file and exclude_file.filename:
+                if not exclude_file.filename.lower().endswith('.csv'):
+                    return f"Exclude file must be a CSV file. Received: {exclude_file.filename}", 400
                 exclude_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename("Exclude.csv"))
                 exclude_file.save(exclude_csv_path)
 
-            # Read mapping file (small, load fully)
-            # Use utf-8-sig to automatically strip BOM (Byte Order Mark)
+            # Validate Raw Data file
+            logging.info("Validating Raw Data file...")
+            valid, error_msg, _ = validate_csv_file(raw_file_path, "Raw Data file")
+            if not valid:
+                logging.error(f"Raw Data validation failed: {error_msg}")
+                return f"Raw Data file error: {error_msg}", 400
+
+            # Validate Mapping file
+            logging.info("Validating Mapping file...")
+            valid, error_msg, _ = validate_csv_file(mapping_file_path, "Mapping file")
+            if not valid:
+                logging.error(f"Mapping file validation failed: {error_msg}")
+                return f"Mapping file error: {error_msg}", 400
+
+            # Validate Exclude file if provided
+            if exclude_csv_path:
+                logging.info("Validating Exclude file...")
+                valid, error_msg, _ = validate_csv_file(exclude_csv_path, "Exclude file")
+                if not valid:
+                    logging.error(f"Exclude file validation failed: {error_msg}")
+                    return f"Exclude file error: {error_msg}", 400
+
+            # Read mapping file with encoding fallback
             logging.info("Reading mapping file...")
-            mapping_df = pd.read_csv(mapping_file_path, encoding='utf-8-sig', low_memory=False)
+            try:
+                mapping_df = read_csv_with_fallback(mapping_file_path, "Mapping file", low_memory=False)
+            except ValueError as e:
+                return str(e), 400
+
+            # Validate mapping file has required columns
+            required_mapping_cols = ["ALDS subscription product ISBN"]
+            missing_cols = [col for col in required_mapping_cols if col not in mapping_df.columns]
+            if missing_cols:
+                return f"Mapping file is missing required columns: {', '.join(missing_cols)}. Found columns: {', '.join(mapping_df.columns.tolist()[:10])}...", 400
+
             logging.info(f"Loaded {len(mapping_df)} mapping records")
 
             # Process raw file in chunks
@@ -487,16 +620,19 @@ def upload_files():
             logging.info("Saving results to CSV...")
             logging.info(f"Columns in valid_orders before saving: {valid_orders.columns.tolist()}")
             logging.info(f"'Sub ID' in valid_orders: {'Sub ID' in valid_orders.columns}")
-            
+
             # Save with utf-8-sig to preserve proper encoding and prevent BOM issues
             valid_orders.to_csv(model_order_list_path, index=False, encoding='utf-8-sig')
             exception_orders.to_csv(exception_report_path, index=False, encoding='utf-8-sig')
-            
-            # Verify what was actually saved
-            saved_df = pd.read_csv(model_order_list_path, encoding='utf-8-sig', nrows=1)
-            logging.info(f"Columns in saved CSV: {saved_df.columns.tolist()}")
-            logging.info(f"'Sub ID' in saved CSV: {'Sub ID' in saved_df.columns}")
-            
+
+            # Verify what was actually saved (only if we have valid orders)
+            if len(valid_orders) > 0:
+                saved_df = pd.read_csv(model_order_list_path, encoding='utf-8-sig', nrows=1)
+                logging.info(f"Columns in saved CSV: {saved_df.columns.tolist()}")
+                logging.info(f"'Sub ID' in saved CSV: {'Sub ID' in saved_df.columns}")
+            else:
+                logging.warning("No valid orders to save - all records were exceptions")
+
             logging.info("Processing complete!")
 
             # Prepare for display (limit preview to first 1000 rows for performance)
@@ -519,6 +655,15 @@ def upload_files():
                                    exception_count=len(exception_orders),
                                    valid_stats=valid_stats)
 
+        except pd.errors.EmptyDataError as e:
+            logging.error(f"Empty data error: {str(e)}")
+            return "Processing error: One of the uploaded files contains no data. Please check that your CSV files are not empty.", 500
+        except pd.errors.ParserError as e:
+            logging.error(f"Parser error: {str(e)}")
+            return f"Processing error: Could not parse CSV file. The file may be corrupted or use an unsupported format. Details: {str(e)}", 500
+        except KeyError as e:
+            logging.error(f"Missing column error: {str(e)}")
+            return f"Processing error: Required column not found in data: {str(e)}. Please check that your files have the correct column headers.", 500
         except Exception as e:
             logging.error(f"Upload error: {str(e)}")
             return f"Processing error: {e}", 500
