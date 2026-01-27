@@ -3,334 +3,398 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Mapping Tool - ISBN Test Results</title>
+    <title>Order Mapping Tool - Validation Test Results</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
-        
+
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
         }
-        
+
         .header {
             background: linear-gradient(135deg, #2c3e50, #34495e);
             color: white;
             padding: 30px;
             text-align: center;
         }
-        
+
         .header h1 {
-            font-size: 2.5em;
+            font-size: 2.2em;
             margin-bottom: 10px;
             font-weight: 300;
         }
-        
+
         .header p {
             font-size: 1.1em;
             opacity: 0.9;
         }
-        
+
         .content {
-            padding: 40px;
-        }
-        
-        .test-result {
             padding: 30px;
+        }
+
+        .summary-banner {
+            padding: 25px;
             border-radius: 12px;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             text-align: center;
             border: 2px solid;
-            position: relative;
-            overflow: hidden;
         }
-        
-        .test-result::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-            transition: left 0.5s;
-        }
-        
-        .test-result:hover::before {
-            left: 100%;
-        }
-        
-        .success {
+
+        .summary-banner.all-passed {
             background: linear-gradient(135deg, #d4edda, #c3e6cb);
             border-color: #28a745;
             color: #155724;
         }
-        
-        .error {
+
+        .summary-banner.has-failures {
             background: linear-gradient(135deg, #f8d7da, #f5c6cb);
             border-color: #dc3545;
             color: #721c24;
         }
-        
-        .test-icon {
-            font-size: 4em;
-            margin-bottom: 20px;
-            display: block;
+
+        .summary-banner.error {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            border-color: #ffc107;
+            color: #856404;
         }
-        
-        .test-result h3 {
-            font-size: 2em;
+
+        .summary-icon {
+            font-size: 3em;
             margin-bottom: 15px;
-            font-weight: 600;
         }
-        
-        .test-message {
+
+        .summary-banner h2 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        .summary-stats {
             font-size: 1.2em;
-            line-height: 1.5;
-            background: rgba(255,255,255,0.7);
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
+            margin-top: 10px;
         }
-        
-        .test-details {
+
+        .test-card {
             background: #f8f9fa;
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            border: 1px solid #e9ecef;
-        }
-        
-        .test-details h4 {
-            color: #2c3e50;
+            border-radius: 10px;
             margin-bottom: 15px;
-            font-size: 1.3em;
+            overflow: hidden;
+            border: 1px solid #e9ecef;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .test-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .test-header {
+            padding: 18px 20px;
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
         }
-        
-        .test-details-icon {
-            margin-right: 10px;
-            font-size: 1.2em;
+
+        .test-header:hover {
+            background: #e9ecef;
         }
-        
+
+        .test-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .test-icon {
+            font-size: 1.5em;
+        }
+
+        .test-name {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        .test-status {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .test-status.passed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .test-status.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .test-body {
+            padding: 0 20px 20px;
+            display: none;
+        }
+
+        .test-body.expanded {
+            display: block;
+        }
+
+        .test-message {
+            padding: 12px 15px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid;
+        }
+
+        .test-message.passed {
+            border-color: #28a745;
+        }
+
+        .test-message.failed {
+            border-color: #dc3545;
+        }
+
+        .test-details {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .test-details h4 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
         .test-details ul {
             list-style: none;
-            padding-left: 0;
+            padding: 0;
         }
-        
+
         .test-details li {
             padding: 8px 0;
             border-bottom: 1px solid #e9ecef;
+            font-size: 0.9em;
+            color: #495057;
+            padding-left: 20px;
             position: relative;
-            padding-left: 25px;
         }
-        
+
         .test-details li:before {
-            content: "•";
+            content: "›";
             position: absolute;
-            left: 0;
+            left: 5px;
             color: #667eea;
             font-weight: bold;
-            font-size: 1.5em;
         }
-        
+
         .test-details li:last-child {
             border-bottom: none;
         }
-        
-        .test-description {
-            background: linear-gradient(135deg, #e7f3ff, #cce7ff);
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            border-left: 4px solid #007bff;
+
+        .test-details li.error-detail {
+            color: #721c24;
+            background: #fff5f5;
+            margin: 4px 0;
+            padding: 8px 8px 8px 20px;
+            border-radius: 4px;
+            border-bottom: none;
         }
-        
-        .test-description h4 {
-            color: #004085;
-            margin-bottom: 10px;
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+            font-size: 1.2em;
+            color: #6c757d;
         }
-        
-        .test-description p {
-            color: #004085;
-            margin: 0;
-            line-height: 1.6;
+
+        .test-card.expanded .expand-icon {
+            transform: rotate(180deg);
         }
-        
+
         .nav-section {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 25px;
         }
-        
+
         .nav-btn {
             display: flex;
             align-items: center;
             justify-content: center;
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
-            padding: 15px 20px;
+            padding: 14px 18px;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            font-size: 0.95em;
         }
-        
+
         .nav-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
             text-decoration: none;
             color: white;
         }
-        
+
         .nav-btn.secondary {
             background: linear-gradient(135deg, #6c757d, #5a6268);
             box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
         }
-        
+
         .nav-btn.secondary:hover {
             box-shadow: 0 6px 20px rgba(108, 117, 125, 0.5);
         }
-        
+
         .btn-icon {
-            font-size: 1.2em;
-            margin-right: 10px;
+            margin-right: 8px;
         }
-        
+
         .footer {
             background: #2c3e50;
             color: white;
-            padding: 20px 40px;
+            padding: 20px 30px;
             text-align: center;
             font-size: 0.9em;
         }
-        
+
+        .expand-all-btn {
+            background: none;
+            border: 1px solid #667eea;
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .expand-all-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
                 border-radius: 8px;
             }
-            
+
             .content {
                 padding: 20px;
             }
-            
+
             .header {
                 padding: 20px;
             }
-            
+
             .header h1 {
-                font-size: 2em;
+                font-size: 1.8em;
             }
-            
-            .test-result {
-                padding: 20px;
+
+            .test-header {
+                flex-wrap: wrap;
+                gap: 10px;
             }
-            
-            .test-icon {
-                font-size: 3em;
-            }
-            
-            .test-result h3 {
-                font-size: 1.5em;
-            }
-            
+
             .nav-section {
                 grid-template-columns: 1fr;
             }
-        }
-        
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📚 ISBN Consistency Test</h1>
-            <p>Verification of ISBN mapping across all uploaded files</p>
+            <h1>Validation Test Results</h1>
+            <p>Comprehensive checks on processed order data</p>
         </div>
-        
+
         <div class="content">
-            <div class="test-description">
-                <h4>🔍 What This Test Checks</h4>
-                <p>
-                    This test verifies that ISBNs can be successfully matched between your Raw Data file, 
-                    Mapping file, and processed output. It ensures the mapping process worked correctly 
-                    and that product information is properly linked.
-                </p>
-            </div>
-            
-            {% if result %}
-                <div class="test-result success">
-                    <span class="test-icon">✅</span>
-                    <h3>Test Passed</h3>
-                    <div class="test-message">{{ message }}</div>
+            {% if error_message %}
+                <div class="summary-banner error">
+                    <div class="summary-icon">⚠️</div>
+                    <h2>Cannot Run Tests</h2>
+                    <p>{{ error_message }}</p>
                 </div>
-                
-                <div class="test-details">
-                    <h4><span class="test-details-icon">✅</span>Success Details</h4>
-                    <ul>
-                        <li>ISBN format consistency verified across all files</li>
-                        <li>Mapping relationships successfully established</li>
-                        <li>Product information properly linked</li>
-                        <li>Data integrity maintained throughout processing</li>
-                    </ul>
+            {% elif test_results %}
+                <div class="summary-banner {% if overall_passed %}all-passed{% else %}has-failures{% endif %}">
+                    <div class="summary-icon">{% if overall_passed %}✅{% else %}❌{% endif %}</div>
+                    <h2>{% if overall_passed %}All Tests Passed{% else %}Some Tests Failed{% endif %}</h2>
+                    <div class="summary-stats">
+                        <strong>{{ passed_count }}</strong> passed, <strong>{{ failed_count }}</strong> failed out of <strong>{{ test_results|length }}</strong> tests
+                    </div>
                 </div>
+
+                <button class="expand-all-btn" onclick="toggleAllTests()">
+                    <span id="expand-btn-text">Expand All Details</span>
+                </button>
+
+                {% for test in test_results %}
+                <div class="test-card" id="test-{{ loop.index }}">
+                    <div class="test-header" onclick="toggleTest({{ loop.index }})">
+                        <div class="test-title">
+                            <span class="test-icon">{% if test.passed %}✅{% else %}❌{% endif %}</span>
+                            <span class="test-name">{{ test.name }}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="test-status {% if test.passed %}passed{% else %}failed{% endif %}">
+                                {% if test.passed %}PASSED{% else %}FAILED{% endif %}
+                            </span>
+                            <span class="expand-icon">▼</span>
+                        </div>
+                    </div>
+                    <div class="test-body" id="test-body-{{ loop.index }}">
+                        <div class="test-message {% if test.passed %}passed{% else %}failed{% endif %}">
+                            {{ test.message }}
+                        </div>
+                        {% if test.details %}
+                        <div class="test-details">
+                            <h4>Details:</h4>
+                            <ul>
+                                {% for detail in test.details %}
+                                <li class="{% if 'mismatch' in detail.lower() or 'error' in detail.lower() or 'missing' in detail.lower() or 'empty' in detail.lower() %}error-detail{% endif %}">
+                                    {{ detail }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
             {% else %}
-                <div class="test-result error">
-                    <span class="test-icon">❌</span>
-                    <h3>Test Failed</h3>
-                    <div class="test-message">{{ message }}</div>
-                </div>
-                
-                <div class="test-details">
-                    <h4><span class="test-details-icon">🛠️</span>Troubleshooting Steps</h4>
-                    <ul>
-                        <li>Verify ISBN column exists in your Raw Data file</li>
-                        <li>Check that "ALDS subscription product ISBN" column exists in Mapping file</li>
-                        <li>Ensure ISBN formats match between files (check for leading zeros or formatting differences)</li>
-                        <li>Confirm the files have been processed successfully before running this test</li>
-                        <li>Check debug information using the Debug Column Info button below</li>
-                    </ul>
+                <div class="summary-banner error">
+                    <div class="summary-icon">⚠️</div>
+                    <h2>No Test Results</h2>
+                    <p>No tests were run. Please process files first.</p>
                 </div>
             {% endif %}
-            
+
             <div class="nav-section">
                 <a href="/" class="nav-btn">
                     <span class="btn-icon">🏠</span>
@@ -338,12 +402,16 @@
                 </a>
                 <a href="/debug_columns" class="nav-btn secondary">
                     <span class="btn-icon">🔍</span>
-                    Debug Column Info
+                    Debug Columns
                 </a>
-                {% if result %}
+                {% if overall_passed %}
                 <a href="/download_valid" class="nav-btn secondary">
                     <span class="btn-icon">📥</span>
-                    Download Results
+                    Download Orders
+                </a>
+                <a href="/download_grouped" class="nav-btn secondary">
+                    <span class="btn-icon">📦</span>
+                    Download Grouped
                 </a>
                 {% endif %}
                 <a href="/health" class="nav-btn secondary">
@@ -352,16 +420,16 @@
                 </a>
             </div>
         </div>
-        
+
         <div class="footer">
-            Test completed at <span id="test-time"></span> • 
-            Pearson Order Mapping Tool • Railway Deployment
+            Tests completed at <span id="test-time"></span> •
+            Pearson Order Mapping Tool
         </div>
     </div>
 
     <script>
         // Display current time
-        document.getElementById('test-time').textContent = 
+        document.getElementById('test-time').textContent =
             new Date().toLocaleString('en-GB', {
                 year: 'numeric',
                 month: '2-digit',
@@ -370,47 +438,56 @@
                 minute: '2-digit',
                 second: '2-digit'
             });
-        
-        // Add animation to test result on page load
-        window.addEventListener('load', function() {
-            const testResult = document.querySelector('.test-result');
-            if (testResult) {
-                testResult.style.opacity = '0';
-                testResult.style.transform = 'translateY(20px)';
-                
-                setTimeout(() => {
-                    testResult.style.transition = 'all 0.5s ease';
-                    testResult.style.opacity = '1';
-                    testResult.style.transform = 'translateY(0)';
-                }, 100);
+
+        // Toggle individual test details
+        function toggleTest(index) {
+            const card = document.getElementById('test-' + index);
+            const body = document.getElementById('test-body-' + index);
+
+            if (body.classList.contains('expanded')) {
+                body.classList.remove('expanded');
+                card.classList.remove('expanded');
+            } else {
+                body.classList.add('expanded');
+                card.classList.add('expanded');
             }
-        });
-        
-        // Add click feedback to navigation buttons
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                // Visual feedback
-                this.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    this.style.transform = '';
-                }, 150);
-            });
-        });
-        
-        // Auto-refresh functionality for failed tests (optional)
-        {% if not result %}
-        let refreshTimer;
-        function startRefreshTimer() {
-            refreshTimer = setTimeout(() => {
-                if (confirm('Would you like to re-run the ISBN consistency test?')) {
-                    window.location.reload();
-                }
-            }, 30000); // 30 seconds
         }
-        
-        // Uncomment the next line to enable auto-refresh prompt
-        // startRefreshTimer();
-        {% endif %}
+
+        // Toggle all tests
+        let allExpanded = false;
+        function toggleAllTests() {
+            allExpanded = !allExpanded;
+            const bodies = document.querySelectorAll('.test-body');
+            const cards = document.querySelectorAll('.test-card');
+            const btnText = document.getElementById('expand-btn-text');
+
+            bodies.forEach(body => {
+                if (allExpanded) {
+                    body.classList.add('expanded');
+                } else {
+                    body.classList.remove('expanded');
+                }
+            });
+
+            cards.forEach(card => {
+                if (allExpanded) {
+                    card.classList.add('expanded');
+                } else {
+                    card.classList.remove('expanded');
+                }
+            });
+
+            btnText.textContent = allExpanded ? 'Collapse All Details' : 'Expand All Details';
+        }
+
+        // Auto-expand failed tests
+        window.addEventListener('load', function() {
+            {% for test in test_results %}
+                {% if not test.passed %}
+                    toggleTest({{ loop.index }});
+                {% endif %}
+            {% endfor %}
+        });
     </script>
 </body>
 </html>
