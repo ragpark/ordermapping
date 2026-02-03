@@ -16,7 +16,7 @@ def setup_logging():
     log_level = os.environ.get('LOG_LEVEL', 'INFO')
     log_file = os.environ.get('LOG_FILE', '/tmp/app.log')
     
-    # Create log directory if it doesn't exist
+    # Create log directory if it isn't there
     log_dir = os.path.dirname(log_file)
     os.makedirs(log_dir, exist_ok=True)
     
