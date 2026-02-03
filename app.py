@@ -1067,7 +1067,7 @@ def test_als_isbn_ui():
         return render_template("test_results.html",
                                test_results=[],
                                overall_passed=False,
-                               error_message="No processed data found. Please upload and process files first.")
+                               error_message="No processed data found. Please upload and process file first.")
 
     if not os.path.exists(mapping_csv_path):
         return render_template("test_results.html",
