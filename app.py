@@ -690,6 +690,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "Postcode": "Postcode",
         "ALDS subscription product name": "ALDS subscription product name",
         "ALDS subscription product ISBN": "ALDS subscription product ISBN",
+        "AH SKU 1 name": "AH SKU 1 name",
         "AH SKU name": "AH SKU name",
         "AH Sku name": "AH Sku name",  # Handle both capitalizations
         "AH Pack name": "AH Pack name",
@@ -703,8 +704,14 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     
     # Log which mapping columns were found
     if chunk_num == 1:
-        found_cols = [col for col in ["AH SKU name", "AH Sku name", "AH Pack name"] if col in model_order_list.columns]
-        missing_cols = [col for col in ["AH SKU name", "AH Sku name", "AH Pack name"] if col not in merged_df.columns]
+        found_cols = [
+            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
+            if col in model_order_list.columns
+        ]
+        missing_cols = [
+            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
+            if col not in merged_df.columns
+        ]
         logging.info(f"Mapping columns found in output: {found_cols}")
         if missing_cols:
             logging.warning(f"Mapping columns NOT found in merged data: {missing_cols}")
