@@ -222,12 +222,13 @@ def group_orders_by_subid(df):
     
     # Order-specific columns - these are pivoted with _1, _2, _3 suffixes
     possible_order_cols = [
-        "ALDS subscription product name", 
+        "ALDS subscription product name",
         "ALDS subscription product ISBN",
-        "AH Line 1 Price", 
-        "AH ISBN 1", 
-        "AH SKU 1", 
-        "AH Package 1", 
+        "AH Line 1 Price",
+        "AH ISBN 1",
+        "AH SKU 1",
+        "AH SKU 1 name",
+        "AH Package 1",
         "AH SKU name",   # Uppercase version
         "AH Sku name",   # Lowercase version (from mapping file)
         "AH Pack name"   # Package name
@@ -703,8 +704,14 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     
     # Log which mapping columns were found
     if chunk_num == 1:
-        found_cols = [col for col in ["AH SKU name", "AH Sku name", "AH Pack name"] if col in model_order_list.columns]
-        missing_cols = [col for col in ["AH SKU name", "AH Sku name", "AH Pack name"] if col not in merged_df.columns]
+        found_cols = [
+            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
+            if col in model_order_list.columns
+        ]
+        missing_cols = [
+            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
+            if col not in merged_df.columns
+        ]
         logging.info(f"Mapping columns found in output: {found_cols}")
         if missing_cols:
             logging.warning(f"Mapping columns NOT found in merged data: {missing_cols}")
@@ -717,6 +724,8 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     model_order_list["AH ISBN 1"] = merged_df["AH Sub 1 ISBN"]
     model_order_list["AH SKU 1"] = merged_df["AH Sub 1 SKU"]
     model_order_list["AH Package 1"] = merged_df["AH Sub 1 Package"]
+    if "AH SKU 1 name" in merged_df.columns:
+        model_order_list["AH SKU 1 name"] = merged_df["AH SKU 1 name"]
 
     # Validate rows
     invalid_mask = model_order_list.apply(row_invalid, axis=1)
