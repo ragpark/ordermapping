@@ -691,11 +691,12 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "Postcode": "Postcode",
         "ALDS subscription product name": "ALDS subscription product name",
         "ALDS subscription product ISBN": "ALDS subscription product ISBN",
+        "Renewal Declined": "Renewal Declined",
         "AH SKU 1 name": "AH SKU 1 name",
         "AH SKU name": "AH SKU name",
         "AH Sku name": "AH Sku name",  # Handle both capitalizations
-        "AH Pack name": "AH Pack name",
-        "Renewal Declined": "Renewal Declined"
+        "AH Pack name": "AH Pack name"
+        
     }
     
     # Select columns efficiently
