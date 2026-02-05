@@ -97,7 +97,7 @@ Required columns:
 - `ALDS subscription product name` - Product name
 - `AH Sub 1 ISBN`, `AH Sub 1 SKU`, `AH Sub 1 Package` - Product codes
 - `ISBN ExVAT List Price` - Pricing information
-- `AH SKU name`, `AH Pack name` - Product descriptions
+- `AH SKU name`, `AH Pack name`, `AH Sub Package Name` - Product descriptions
 
 ### Exclusion CSV (Optional)
 Should contain one of:

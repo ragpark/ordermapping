@@ -229,6 +229,7 @@ def group_orders_by_subid(df):
         "AH SKU 1",
         "AH SKU 1 name",
         "AH Package 1",
+        "AH Sub Package Name",
         "AH SKU name",   # Uppercase version
         "AH Sku name",   # Lowercase version (from mapping file)
         "AH Pack name"   # Package name
@@ -692,6 +693,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "ALDS subscription product name": "ALDS subscription product name",
         "ALDS subscription product ISBN": "ALDS subscription product ISBN",
         "Renewal Declined": "Renewal Declined",
+        "AH Sub Package Name": "AH Sub Package Name",
         "AH SKU 1 name": "AH SKU 1 name",
         "AH SKU name": "AH SKU name",
         "AH Sku name": "AH Sku name",  # Handle both capitalizations
@@ -707,11 +709,11 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     # Log which mapping columns were found
     if chunk_num == 1:
         found_cols = [
-            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
+            col for col in ["AH Sub Package Name", "AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
             if col in model_order_list.columns
         ]
         missing_cols = [
-            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
+            col for col in ["AH Sub Package Name", "AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
             if col not in merged_df.columns
         ]
         logging.info(f"Mapping columns found in output: {found_cols}")
