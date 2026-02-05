@@ -703,11 +703,11 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "ALDS subscription product name": ["ALDS subscription product name"],
         "ALDS subscription product ISBN": ["ALDS subscription product ISBN"],
         "Renewal Declined": ["Renewal Declined"],
-        "AH Sub Package Name": [
-            "AH Sub Package Name",
-            "AH Sub 1 Package Name",
-            "AH Sub Package Name_y",
-            "AH Sub 1 Package Name_y"
+        "AH Sub 1 Sub Package Name": [
+            "AH Sub 1 Sub Package Name",
+            "AH Sub 1 Sub Package Name",
+            "AH Sub 1 Sub Package Name_y",
+            "AH Sub 1 Sub Package Name_y"
         ],
         "AH SKU 1 name": ["AH SKU 1 name"],
         "AH SKU name": ["AH SKU name"],
@@ -725,7 +725,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     # Log which mapping columns were found
     if chunk_num == 1:
         debug_col_aliases = {
-            "AH Sub Package Name": ["AH Sub Package Name", "AH Sub 1 Package Name", "AH Sub Package Name_y", "AH Sub 1 Package Name_y"],
+            "AH Sub 1 Sub Package Namee": ["AH Sub Package Name", "AH Sub 1 Sub Package Name", "AH Sub 1 Sub Package Name_y", "AH Sub 1 Sub Package Name_y"],
             "AH SKU 1 name": ["AH SKU 1 name"],
             "AH SKU name": ["AH SKU name"],
             "AH Sku name": ["AH Sku name"],
