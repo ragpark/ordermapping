@@ -695,6 +695,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     columns_map = {
         "Customer name": ["Customer name"],
         "School name": ["School name"],
+        "School key": ["School key"],
         "Email": ["Email"],
         "End date": ["End date"],
         "Address": ["Address"],
