@@ -227,11 +227,9 @@ def group_orders_by_subid(df):
         "AH Line 1 Price",
         "AH ISBN 1",
         "AH SKU 1",
-        "AH SKU 1 name",
         "AH Package 1",
         "AH Sub Package Name",
-        "AH SKU name",   # Uppercase version
-        "AH Sku name",   # Lowercase version (from mapping file)
+        "AH SKU name",   # Standardized SKU name
         "AH Pack name"   # Package name
     ]
     sub_package_name_cols = sorted(
@@ -427,12 +425,12 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
         order_sku_name_col = None
         mapping_sku_name_col = None
 
-        for col in ["AH SKU name", "AH Sku name"]:
+        for col in ["AH SKU name", "AH SKU 1 name"]:
             if col in order_df.columns:
                 order_sku_name_col = col
                 break
 
-        for col in ["AH SKU name", "AH Sku name"]:
+        for col in ["AH SKU name", "AH Sku name", "AH SKU 1 name"]:
             if col in mapping_df.columns:
                 mapping_sku_name_col = col
                 break
@@ -725,13 +723,13 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "Renewal Declined": ["Renewal Declined"],
         "AH Sub Package Name": [
             "AH Sub Package Name",
+            "AH Sub 1 Sub Package Name",
             "AH Sub 1 Package Name",
             "AH Sub Package Name_y",
-            "AH Sub 1 Package Name_y"
+            "AH Sub 1 Package Name_y",
+            "AH Sub 1 Sub Package Name_y"
         ],
-        "AH SKU 1 name": ["AH SKU 1 name"],
-        "AH SKU name": ["AH SKU name"],
-        "AH Sku name": ["AH Sku name"],  # Handle both capitalizations
+        "AH SKU name": ["AH SKU 1 name", "AH SKU name", "AH Sku name"],
         "AH Pack name": ["AH Pack name"]
 
     }
@@ -750,10 +748,15 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             [col for col in model_order_list.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
         )
         debug_col_aliases = {
-            "AH Sub Package Name": ["AH Sub Package Name", "AH Sub 1 Package Name", "AH Sub Package Name_y", "AH Sub 1 Package Name_y"],
-            "AH SKU 1 name": ["AH SKU 1 name"],
-            "AH SKU name": ["AH SKU name"],
-            "AH Sku name": ["AH Sku name"],
+            "AH Sub Package Name": [
+                "AH Sub Package Name",
+                "AH Sub 1 Sub Package Name",
+                "AH Sub 1 Package Name",
+                "AH Sub Package Name_y",
+                "AH Sub 1 Package Name_y",
+                "AH Sub 1 Sub Package Name_y"
+            ],
+            "AH SKU name": ["AH SKU 1 name", "AH SKU name", "AH Sku name"],
             "AH Pack name": ["AH Pack name"]
         }
         found_cols = [
@@ -772,14 +775,21 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     
     # Format school key
     model_order_list["School key"] = merged_df["School key"].apply(format_school_key)
+
+    # Ensure School key is adjacent to School name in output
+    if "School key" in model_order_list.columns and "School name" in model_order_list.columns:
+        reordered_cols = [col for col in model_order_list.columns if col != "School key"]
+        school_name_index = reordered_cols.index("School name")
+        reordered_cols.insert(school_name_index + 1, "School key")
+        model_order_list = model_order_list[reordered_cols]
     
     # Add pricing and product info
     model_order_list["AH Line 1 Price"] = merged_df["ISBN ExVAT List Price"]
     model_order_list["AH ISBN 1"] = merged_df["AH Sub 1 ISBN"]
     model_order_list["AH SKU 1"] = merged_df["AH Sub 1 SKU"]
     model_order_list["AH Package 1"] = merged_df["AH Sub 1 Package"]
-    if "AH SKU 1 name" in merged_df.columns:
-        model_order_list["AH SKU 1 name"] = merged_df["AH SKU 1 name"]
+    if "AH SKU 1 name" in merged_df.columns and "AH SKU name" not in model_order_list.columns:
+        model_order_list["AH SKU name"] = merged_df["AH SKU 1 name"]
 
     # Validate rows
     invalid_mask = model_order_list.apply(row_invalid, axis=1)
@@ -1084,7 +1094,7 @@ def download_grouped():
         
         # Log what columns are available before grouping
         logging.info(f"Columns in Model Order List before grouping: {df.columns.tolist()}")
-        logging.info(f"Checking for name columns: AH SKU name={('AH SKU name' in df.columns)}, AH Sku name={('AH Sku name' in df.columns)}, AH Pack name={('AH Pack name' in df.columns)}")
+        logging.info(f"Checking for name columns: AH SKU name={('AH SKU name' in df.columns)}, AH Pack name={('AH Pack name' in df.columns)}")
         
         # Check if Sub ID column exists
         if 'Sub ID' not in df.columns:
