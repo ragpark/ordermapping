@@ -229,7 +229,7 @@ def group_orders_by_subid(df):
         "AH SKU 1",
         "AH SKU 1 name",
         "AH Package 1",
-        "AH Sub Package Name",
+        "AH Sub 1 Package Name",
         "AH SKU name",   # Uppercase version
         "AH Sku name",   # Lowercase version (from mapping file)
         "AH Pack name"   # Package name
@@ -238,8 +238,8 @@ def group_orders_by_subid(df):
         [col for col in df.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
     )
     possible_order_cols.extend(sub_package_name_cols)
-    if "AH Sub Package Name" in df.columns:
-        possible_order_cols.append("AH Sub Package Name")
+    if "AH Sub 1 Package Name" in df.columns:
+        possible_order_cols.append("AH Sub 1 Package Name")
     order_cols = [col for col in dict.fromkeys(possible_order_cols) if col in df.columns]
     
     # Log which columns were found
@@ -723,8 +723,8 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "ALDS subscription product name": ["ALDS subscription product name"],
         "ALDS subscription product ISBN": ["ALDS subscription product ISBN"],
         "Renewal Declined": ["Renewal Declined"],
-        "AH Sub Package Name": [
-            "AH Sub Package Name",
+        "AH Sub 1 Package Name": [
+            "AH Sub 1 Package Name",
             "AH Sub 1 Package Name",
             "AH Sub Package Name_y",
             "AH Sub 1 Package Name_y"
@@ -750,7 +750,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             [col for col in model_order_list.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
         )
         debug_col_aliases = {
-            "AH Sub Package Name": ["AH Sub Package Name", "AH Sub 1 Package Name", "AH Sub Package Name_y", "AH Sub 1 Package Name_y"],
+            "AH Sub 1 Package Name": ["AH Sub 1 Package Name", "AH Sub 1 Package Name", "AH Sub Package Name_y", "AH Sub 1 Package Name_y"],
             "AH SKU 1 name": ["AH SKU 1 name"],
             "AH SKU name": ["AH SKU name"],
             "AH Sku name": ["AH Sku name"],
