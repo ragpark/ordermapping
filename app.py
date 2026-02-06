@@ -233,7 +233,13 @@ def group_orders_by_subid(df):
         "AH Sku name",   # Lowercase version (from mapping file)
         "AH Pack name"   # Package name
     ]
-    order_cols = [col for col in possible_order_cols if col in df.columns]
+    sub_package_name_cols = sorted(
+        [col for col in df.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
+    )
+    possible_order_cols.extend(sub_package_name_cols)
+    if "AH Sub Package Name" in df.columns:
+        possible_order_cols.append("AH Sub Package Name")
+    order_cols = [col for col in dict.fromkeys(possible_order_cols) if col in df.columns]
     
     # Log which columns were found
     logging.info(f"Order columns found for grouping: {order_cols}")
@@ -633,6 +639,15 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     Returns: (valid_orders_df, exception_orders_df)
     """
     logging.info(f"Processing chunk {chunk_num} with {len(chunk_df)} rows")
+
+    def find_column(df, candidate_names):
+        """Return first matching column from candidate names (case/space-insensitive)."""
+        normalized = {str(col).strip().lower(): col for col in df.columns}
+        for name in candidate_names:
+            match = normalized.get(str(name).strip().lower())
+            if match is not None:
+                return match
+        return None
     
     # Normalize ISBN format - convert to consistent string format
     # Handle both integer and float ISBNs, and deal with NaN values
@@ -681,40 +696,76 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     else:
         logging.warning(f"Chunk {chunk_num}: 'Sub ID' column missing from raw data - grouping will not be available")
     
+    def add_sub_package_name_columns():
+        pattern = re.compile(r"^ah sub (\d+) package name(_y)?$", re.IGNORECASE)
+        normalized_map = {}
+        for col in merged_df.columns:
+            match = pattern.match(str(col).strip())
+            if not match:
+                continue
+            number = match.group(1)
+            normalized_col = f"AH Sub {number} Package Name"
+            is_merge_suffix = match.group(2) is not None
+            if normalized_col not in normalized_map or not is_merge_suffix:
+                normalized_map[normalized_col] = col
+        for normalized_col, source_col in normalized_map.items():
+            model_order_list[normalized_col] = merged_df[source_col]
+
     # Define other columns to map
     columns_map = {
-        "Customer name": "Customer name",
-        "School name": "School name",
-        "Email": "Email",
-        "End date": "End date",
-        "Address": "Address",
-        "Postcode": "Postcode",
-        "ALDS subscription product name": "ALDS subscription product name",
-        "ALDS subscription product ISBN": "ALDS subscription product ISBN",
-        "Renewal Declined": "Renewal Declined",
-        "AH SKU 1 name": "AH SKU 1 name",
-        "AH SKU name": "AH SKU name",
-        "AH Sku name": "AH Sku name",  # Handle both capitalizations
-        "AH Pack name": "AH Pack name"
-        
+        "Customer name": ["Customer name"],
+        "School name": ["School name"],
+        "Email": ["Email"],
+        "End date": ["End date"],
+        "Address": ["Address"],
+        "Postcode": ["Postcode"],
+        "ALDS subscription product name": ["ALDS subscription product name"],
+        "ALDS subscription product ISBN": ["ALDS subscription product ISBN"],
+        "Renewal Declined": ["Renewal Declined"],
+        "AH Sub Package Name": [
+            "AH Sub Package Name",
+            "AH Sub 1 Package Name",
+            "AH Sub Package Name_y",
+            "AH Sub 1 Package Name_y"
+        ],
+        "AH SKU 1 name": ["AH SKU 1 name"],
+        "AH SKU name": ["AH SKU name"],
+        "AH Sku name": ["AH Sku name"],  # Handle both capitalizations
+        "AH Pack name": ["AH Pack name"]
+
     }
-    
+
     # Select columns efficiently
-    for new_col, source_col in columns_map.items():
-        if source_col in merged_df.columns:
+    for new_col, source_candidates in columns_map.items():
+        source_col = find_column(merged_df, source_candidates)
+        if source_col is not None:
             model_order_list[new_col] = merged_df[source_col]
+
+    add_sub_package_name_columns()
     
     # Log which mapping columns were found
     if chunk_num == 1:
+        sub_package_name_cols = sorted(
+            [col for col in model_order_list.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
+        )
+        debug_col_aliases = {
+            "AH Sub Package Name": ["AH Sub Package Name", "AH Sub 1 Package Name", "AH Sub Package Name_y", "AH Sub 1 Package Name_y"],
+            "AH SKU 1 name": ["AH SKU 1 name"],
+            "AH SKU name": ["AH SKU name"],
+            "AH Sku name": ["AH Sku name"],
+            "AH Pack name": ["AH Pack name"]
+        }
         found_cols = [
-            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
+            col for col in debug_col_aliases
             if col in model_order_list.columns
         ]
         missing_cols = [
-            col for col in ["AH SKU 1 name", "AH SKU name", "AH Sku name", "AH Pack name"]
-            if col not in merged_df.columns
+            col for col, aliases in debug_col_aliases.items()
+            if find_column(merged_df, aliases) is None
         ]
         logging.info(f"Mapping columns found in output: {found_cols}")
+        if sub_package_name_cols:
+            logging.info(f"Mapping sub package name columns found: {sub_package_name_cols}")
         if missing_cols:
             logging.warning(f"Mapping columns NOT found in merged data: {missing_cols}")
     
@@ -771,6 +822,9 @@ def process_files_chunked(raw_file_path, mapping_df, exclude_csv_path=None):
                 return str(isbn).strip()
         
         mapping_df['ALDS subscription product ISBN'] = mapping_df['ALDS subscription product ISBN'].apply(normalize_isbn)
+
+        # Normalize mapping headers so columns with leading/trailing spaces still map correctly
+        mapping_df.columns = [str(col).strip() for col in mapping_df.columns]
         
         # Get total rows for progress tracking
         total_rows = sum(1 for _ in open(raw_file_path, encoding='latin1')) - 1  # Subtract header
