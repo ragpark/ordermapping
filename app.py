@@ -7,7 +7,7 @@ from flask import Flask, request, render_template, send_file, jsonify
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables 
 load_dotenv()
 
 # --- Setup Logging for Railway ---
@@ -229,6 +229,7 @@ def group_orders_by_subid(df):
         "AH SKU 1",
         "AH SKU 1 name",
         "AH Package 1",
+        "AH Sub Package Name",
         "AH SKU name",   # Uppercase version
         "AH Sku name",   # Lowercase version (from mapping file)
         "AH Pack name"   # Package name
