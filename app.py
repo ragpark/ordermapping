@@ -234,7 +234,13 @@ def group_orders_by_subid(df):
         "AH Sku name",   # Lowercase version (from mapping file)
         "AH Pack name"   # Package name
     ]
-    order_cols = [col for col in possible_order_cols if col in df.columns]
+    sub_package_name_cols = sorted(
+        [col for col in df.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
+    )
+    possible_order_cols.extend(sub_package_name_cols)
+    if "AH Sub Package Name" in df.columns:
+        possible_order_cols.append("AH Sub Package Name")
+    order_cols = [col for col in dict.fromkeys(possible_order_cols) if col in df.columns]
     
     # Log which columns were found
     logging.info(f"Order columns found for grouping: {order_cols}")
@@ -691,11 +697,25 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     else:
         logging.warning(f"Chunk {chunk_num}: 'Sub ID' column missing from raw data - grouping will not be available")
     
+    def add_sub_package_name_columns():
+        pattern = re.compile(r"^ah sub (\d+) package name(_y)?$", re.IGNORECASE)
+        normalized_map = {}
+        for col in merged_df.columns:
+            match = pattern.match(str(col).strip())
+            if not match:
+                continue
+            number = match.group(1)
+            normalized_col = f"AH Sub {number} Package Name"
+            is_merge_suffix = match.group(2) is not None
+            if normalized_col not in normalized_map or not is_merge_suffix:
+                normalized_map[normalized_col] = col
+        for normalized_col, source_col in normalized_map.items():
+            model_order_list[normalized_col] = merged_df[source_col]
+
     # Define other columns to map
     columns_map = {
         "Customer name": ["Customer name"],
         "School name": ["School name"],
-        "School key": ["School key"],
         "Email": ["Email"],
         "End date": ["End date"],
         "Address": ["Address"],
@@ -703,11 +723,11 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "ALDS subscription product name": ["ALDS subscription product name"],
         "ALDS subscription product ISBN": ["ALDS subscription product ISBN"],
         "Renewal Declined": ["Renewal Declined"],
-        "AH Sub 1 Sub Package Name": [
-            "AH Sub 1 Sub Package Name",
-            "AH Sub 1 Sub Package Name",
-            "AH Sub 1 Sub Package Name_y",
-            "AH Sub 1 Sub Package Name_y"
+        "AH Sub Package Name": [
+            "AH Sub Package Name",
+            "AH Sub 1 Package Name",
+            "AH Sub Package Name_y",
+            "AH Sub 1 Package Name_y"
         ],
         "AH SKU 1 name": ["AH SKU 1 name"],
         "AH SKU name": ["AH SKU name"],
@@ -721,11 +741,16 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         source_col = find_column(merged_df, source_candidates)
         if source_col is not None:
             model_order_list[new_col] = merged_df[source_col]
+
+    add_sub_package_name_columns()
     
     # Log which mapping columns were found
     if chunk_num == 1:
+        sub_package_name_cols = sorted(
+            [col for col in model_order_list.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
+        )
         debug_col_aliases = {
-            "AH Sub 1 Sub Package Namee": ["AH Sub Package Name", "AH Sub 1 Sub Package Name", "AH Sub 1 Sub Package Name_y", "AH Sub 1 Sub Package Name_y"],
+            "AH Sub Package Name": ["AH Sub Package Name", "AH Sub 1 Package Name", "AH Sub Package Name_y", "AH Sub 1 Package Name_y"],
             "AH SKU 1 name": ["AH SKU 1 name"],
             "AH SKU name": ["AH SKU name"],
             "AH Sku name": ["AH Sku name"],
@@ -740,6 +765,8 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             if find_column(merged_df, aliases) is None
         ]
         logging.info(f"Mapping columns found in output: {found_cols}")
+        if sub_package_name_cols:
+            logging.info(f"Mapping sub package name columns found: {sub_package_name_cols}")
         if missing_cols:
             logging.warning(f"Mapping columns NOT found in merged data: {missing_cols}")
     
