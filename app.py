@@ -95,8 +95,8 @@ def row_invalid(row):
     # Validate email and postcode
     if not is_valid_email(row["Email"]):
         return True
-    if not is_valid_uk_postcode(row["Postcode"]):
-        return True
+    #if not is_valid_uk_postcode(row["Postcode"]):
+    #    return True
     
     return False
 
