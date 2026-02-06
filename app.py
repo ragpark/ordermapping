@@ -723,9 +723,11 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         "Renewal Declined": ["Renewal Declined"],
         "AH Sub Package Name": [
             "AH Sub Package Name",
+            "AH Sub 1 Sub Package Name",
             "AH Sub 1 Package Name",
             "AH Sub Package Name_y",
-            "AH Sub 1 Package Name_y"
+            "AH Sub 1 Package Name_y",
+            "AH Sub 1 Sub Package Name_y"
         ],
         "AH SKU name": ["AH SKU 1 name", "AH SKU name", "AH Sku name"],
         "AH Pack name": ["AH Pack name"]
@@ -746,7 +748,14 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             [col for col in model_order_list.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
         )
         debug_col_aliases = {
-            "AH Sub Package Name": ["AH Sub Package Name", "AH Sub 1 Package Name", "AH Sub Package Name_y", "AH Sub 1 Package Name_y"],
+            "AH Sub Package Name": [
+                "AH Sub Package Name",
+                "AH Sub 1 Sub Package Name",
+                "AH Sub 1 Package Name",
+                "AH Sub Package Name_y",
+                "AH Sub 1 Package Name_y",
+                "AH Sub 1 Sub Package Name_y"
+            ],
             "AH SKU name": ["AH SKU 1 name", "AH SKU name", "AH Sku name"],
             "AH Pack name": ["AH Pack name"]
         }
