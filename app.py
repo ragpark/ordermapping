@@ -766,6 +766,13 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     
     # Format school key
     model_order_list["School key"] = merged_df["School key"].apply(format_school_key)
+
+    # Ensure School key is adjacent to School name in output
+    if "School key" in model_order_list.columns and "School name" in model_order_list.columns:
+        reordered_cols = [col for col in model_order_list.columns if col != "School key"]
+        school_name_index = reordered_cols.index("School name")
+        reordered_cols.insert(school_name_index + 1, "School key")
+        model_order_list = model_order_list[reordered_cols]
     
     # Add pricing and product info
     model_order_list["AH Line 1 Price"] = merged_df["ISBN ExVAT List Price"]
