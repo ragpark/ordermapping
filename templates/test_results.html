@@ -404,6 +404,12 @@
                     <span class="btn-icon">🔍</span>
                     Debug Columns
                 </a>
+                {% if test_results %}
+                <a href="/download_test_report" class="nav-btn secondary">
+                    <span class="btn-icon">📝</span>
+                    Download Test Report
+                </a>
+                {% endif %}
                 {% if overall_passed %}
                 <a href="/download_valid" class="nav-btn secondary">
                     <span class="btn-icon">📥</span>

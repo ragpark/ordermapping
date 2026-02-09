@@ -2,6 +2,7 @@ import os
 import re
 import logging
 import sys
+from datetime import datetime
 import pandas as pd
 from flask import Flask, request, render_template, send_file, jsonify
 from werkzeug.utils import secure_filename
@@ -632,6 +633,29 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
 
     return results
 
+def build_test_report(test_results, overall_passed, passed_count, failed_count, generated_at):
+    """Build a plain-text validation report."""
+    lines = [
+        "Validation Test Report",
+        f"Generated at: {generated_at}",
+        f"Overall result: {'PASSED' if overall_passed else 'FAILED'}",
+        f"Summary: {passed_count} passed, {failed_count} failed out of {len(test_results)} tests",
+        ""
+    ]
+
+    for index, test in enumerate(test_results, start=1):
+        status = "PASSED" if test.get("passed") else "FAILED"
+        lines.append(f"{index}. {test.get('name', 'Unnamed Test')} - {status}")
+        lines.append(f"   Message: {test.get('message', '')}")
+        details = test.get("details") or []
+        if details:
+            lines.append("   Details:")
+            for detail in details:
+                lines.append(f"    - {detail}")
+        lines.append("")
+
+    return "\n".join(lines)
+
 def process_chunk(chunk_df, mapping_df, chunk_num):
     """
     Process a single chunk of raw data.
@@ -1166,6 +1190,54 @@ def test_als_isbn_ui():
                            passed_count=passed_count,
                            failed_count=failed_count,
                            error_message=None)
+
+@app.route("/download_test_report")
+def download_test_report():
+    """Download a plain-text validation report with timestamp."""
+    raw_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], "raw_data.csv")
+    mapping_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], "example_mapping.csv")
+
+    if not os.path.exists(model_order_list_path):
+        return "No processed data found. Please upload and process file first.", 404
+
+    if not os.path.exists(mapping_csv_path):
+        return "Mapping file not found. Please upload files first.", 404
+
+    isbn_result, isbn_message = test_als_isbn_consistency(raw_csv_path, mapping_csv_path, model_order_list_path)
+    test_results = run_all_tests(mapping_csv_path, model_order_list_path)
+    test_results.insert(0, {
+        "name": "ISBN Consistency Check",
+        "passed": isbn_result,
+        "message": isbn_message,
+        "details": ["Verifies ISBNs match across Raw Data, Mapping, and Output files"]
+    })
+
+    overall_passed = all(test["passed"] for test in test_results)
+    passed_count = sum(1 for test in test_results if test["passed"])
+    failed_count = len(test_results) - passed_count
+
+    generated_at = datetime.now()
+    generated_at_text = generated_at.strftime("%Y-%m-%d %H:%M:%S")
+    report_text = build_test_report(
+        test_results,
+        overall_passed,
+        passed_count,
+        failed_count,
+        generated_at_text
+    )
+    filename_timestamp = generated_at.strftime("%Y%m%d_%H%M%S")
+    filename = f"validation_test_report_{filename_timestamp}.txt"
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    with open(report_path, "w", encoding="utf-8") as report_file:
+        report_file.write(report_text)
+
+    return send_file(
+        report_path,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="text/plain"
+    )
 
 @app.route("/debug_columns")
 def debug_columns():
