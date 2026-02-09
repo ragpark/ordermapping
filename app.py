@@ -2,6 +2,7 @@ import os
 import re
 import logging
 import sys
+from datetime import datetime
 import pandas as pd
 from flask import Flask, request, render_template, send_file, jsonify
 from werkzeug.utils import secure_filename
@@ -14,11 +15,12 @@ load_dotenv()
 def setup_logging():
     """Configure logging for Railway deployment."""
     log_level = os.environ.get('LOG_LEVEL', 'INFO')
-    log_file = os.environ.get('LOG_FILE', '/tmp/app.log')
+    log_file = os.environ.get('LOG_FILE') or '/tmp/app.log'
     
     # Create log directory if it isn't there
     log_dir = os.path.dirname(log_file)
-    os.makedirs(log_dir, exist_ok=True)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
     
     # Configure logging to both file and stdout (Railway captures stdout)
     logging.basicConfig(
@@ -37,11 +39,16 @@ app = Flask(__name__)
 
 # Railway-compatible configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', '/tmp/uploads')
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER') or '/tmp/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB limit
 
 # Create upload directory
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+try:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+except OSError as exc:
+    logging.warning(f"Failed to create upload folder '{app.config['UPLOAD_FOLDER']}': {exc}")
+    app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Chunk size for processing large files
 CHUNK_SIZE = int(os.environ.get('CHUNK_SIZE', 5000))
@@ -536,6 +543,7 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
     # === TEST 4: Email Validation (ends with 1 or 2) ===
     # Emails ending with 1 or 2 will fail
     test4_details = []
+    test4_report_details = []
     test4_passed = True
     problem_emails = []
 
@@ -559,6 +567,9 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
                     test4_details.append(f"Row {row_num}: {email}")
                 if len(problem_emails) > 5:
                     test4_details.append(f"...and {len(problem_emails) - 5} more problem emails")
+                test4_report_details.extend(
+                    [f"Row {row_num}: {email}" for row_num, email in problem_emails]
+                )
             else:
                 test4_details.append(f"All {len(order_df)} emails passed validation")
     except Exception as e:
@@ -569,7 +580,8 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
         "name": "Email Validation",
         "passed": test4_passed,
         "message": "All emails are valid" if test4_passed else f"{len(problem_emails)} emails will cause order failures",
-        "details": test4_details
+        "details": test4_details,
+        "report_details": test4_report_details or test4_details
     })
 
     # === TEST 5: Price Consistency Check ===
@@ -631,6 +643,29 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
     })
 
     return results
+
+def build_test_report(test_results, overall_passed, passed_count, failed_count, generated_at):
+    """Build a plain-text validation report."""
+    lines = [
+        "Validation Test Report",
+        f"Generated at: {generated_at}",
+        f"Overall result: {'PASSED' if overall_passed else 'FAILED'}",
+        f"Summary: {passed_count} passed, {failed_count} failed out of {len(test_results)} tests",
+        ""
+    ]
+
+    for index, test in enumerate(test_results, start=1):
+        status = "PASSED" if test.get("passed") else "FAILED"
+        lines.append(f"{index}. {test.get('name', 'Unnamed Test')} - {status}")
+        lines.append(f"   Message: {test.get('message', '')}")
+        details = test.get("report_details") or test.get("details") or []
+        if details:
+            lines.append("   Details:")
+            for detail in details:
+                lines.append(f"    - {detail}")
+        lines.append("")
+
+    return "\n".join(lines)
 
 def process_chunk(chunk_df, mapping_df, chunk_num):
     """
@@ -1166,6 +1201,54 @@ def test_als_isbn_ui():
                            passed_count=passed_count,
                            failed_count=failed_count,
                            error_message=None)
+
+@app.route("/download_test_report")
+def download_test_report():
+    """Download a plain-text validation report with timestamp."""
+    raw_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], "raw_data.csv")
+    mapping_csv_path = os.path.join(app.config['UPLOAD_FOLDER'], "example_mapping.csv")
+
+    if not os.path.exists(model_order_list_path):
+        return "No processed data found. Please upload and process file first.", 404
+
+    if not os.path.exists(mapping_csv_path):
+        return "Mapping file not found. Please upload files first.", 404
+
+    isbn_result, isbn_message = test_als_isbn_consistency(raw_csv_path, mapping_csv_path, model_order_list_path)
+    test_results = run_all_tests(mapping_csv_path, model_order_list_path)
+    test_results.insert(0, {
+        "name": "ISBN Consistency Check",
+        "passed": isbn_result,
+        "message": isbn_message,
+        "details": ["Verifies ISBNs match across Raw Data, Mapping, and Output files"]
+    })
+
+    overall_passed = all(test["passed"] for test in test_results)
+    passed_count = sum(1 for test in test_results if test["passed"])
+    failed_count = len(test_results) - passed_count
+
+    generated_at = datetime.now()
+    generated_at_text = generated_at.strftime("%Y-%m-%d %H:%M:%S")
+    report_text = build_test_report(
+        test_results,
+        overall_passed,
+        passed_count,
+        failed_count,
+        generated_at_text
+    )
+    filename_timestamp = generated_at.strftime("%Y%m%d_%H%M%S")
+    filename = f"validation_test_report_{filename_timestamp}.txt"
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    with open(report_path, "w", encoding="utf-8") as report_file:
+        report_file.write(report_text)
+
+    return send_file(
+        report_path,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="text/plain"
+    )
 
 @app.route("/debug_columns")
 def debug_columns():
