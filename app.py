@@ -15,11 +15,12 @@ load_dotenv()
 def setup_logging():
     """Configure logging for Railway deployment."""
     log_level = os.environ.get('LOG_LEVEL', 'INFO')
-    log_file = os.environ.get('LOG_FILE', '/tmp/app.log')
+    log_file = os.environ.get('LOG_FILE') or '/tmp/app.log'
     
     # Create log directory if it isn't there
     log_dir = os.path.dirname(log_file)
-    os.makedirs(log_dir, exist_ok=True)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
     
     # Configure logging to both file and stdout (Railway captures stdout)
     logging.basicConfig(
@@ -38,11 +39,16 @@ app = Flask(__name__)
 
 # Railway-compatible configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', '/tmp/uploads')
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER') or '/tmp/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB limit
 
 # Create upload directory
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+try:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+except OSError as exc:
+    logging.warning(f"Failed to create upload folder '{app.config['UPLOAD_FOLDER']}': {exc}")
+    app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Chunk size for processing large files
 CHUNK_SIZE = int(os.environ.get('CHUNK_SIZE', 5000))
