@@ -2,7 +2,6 @@ import os
 import re
 import logging
 import sys
-import io
 from datetime import datetime
 import pandas as pd
 from flask import Flask, request, render_template, send_file, jsonify
@@ -1228,9 +1227,13 @@ def download_test_report():
     )
     filename_timestamp = generated_at.strftime("%Y%m%d_%H%M%S")
     filename = f"validation_test_report_{filename_timestamp}.txt"
+    report_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    with open(report_path, "w", encoding="utf-8") as report_file:
+        report_file.write(report_text)
 
     return send_file(
-        io.BytesIO(report_text.encode("utf-8")),
+        report_path,
         as_attachment=True,
         download_name=filename,
         mimetype="text/plain"
