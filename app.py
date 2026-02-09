@@ -543,6 +543,7 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
     # === TEST 4: Email Validation (ends with 1 or 2) ===
     # Emails ending with 1 or 2 will fail
     test4_details = []
+    test4_report_details = []
     test4_passed = True
     problem_emails = []
 
@@ -566,6 +567,9 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
                     test4_details.append(f"Row {row_num}: {email}")
                 if len(problem_emails) > 5:
                     test4_details.append(f"...and {len(problem_emails) - 5} more problem emails")
+                test4_report_details.extend(
+                    [f"Row {row_num}: {email}" for row_num, email in problem_emails]
+                )
             else:
                 test4_details.append(f"All {len(order_df)} emails passed validation")
     except Exception as e:
@@ -576,7 +580,8 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
         "name": "Email Validation",
         "passed": test4_passed,
         "message": "All emails are valid" if test4_passed else f"{len(problem_emails)} emails will cause order failures",
-        "details": test4_details
+        "details": test4_details,
+        "report_details": test4_report_details or test4_details
     })
 
     # === TEST 5: Price Consistency Check ===
@@ -653,7 +658,7 @@ def build_test_report(test_results, overall_passed, passed_count, failed_count, 
         status = "PASSED" if test.get("passed") else "FAILED"
         lines.append(f"{index}. {test.get('name', 'Unnamed Test')} - {status}")
         lines.append(f"   Message: {test.get('message', '')}")
-        details = test.get("details") or []
+        details = test.get("report_details") or test.get("details") or []
         if details:
             lines.append("   Details:")
             for detail in details:
