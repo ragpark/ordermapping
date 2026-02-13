@@ -353,40 +353,64 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
             "details": ["Process files first to generate the order list"]
         }]
 
+    # Build AH ISBN-based lookup tables from mapping rows.
+    def normalize_lookup_isbn(value):
+        try:
+            if pd.isna(value):
+                return ""
+            return str(int(float(value)))
+        except (TypeError, ValueError):
+            return str(value).strip()
+
+    package_lookup = {}
+    sku_lookup = {}
+    for _, map_row in mapping_df.iterrows():
+        for col in mapping_df.columns:
+            match = re.match(r"^AH Sub (\d+) ISBN$", str(col).strip(), re.IGNORECASE)
+            if not match:
+                continue
+            sub_number = match.group(1)
+            ah_isbn = normalize_lookup_isbn(map_row.get(col))
+            if not ah_isbn:
+                continue
+
+            package_col = next((c for c in mapping_df.columns if str(c).strip().lower() == f"ah sub {sub_number} package".lower()), None)
+            sku_col = next((c for c in mapping_df.columns if str(c).strip().lower() == f"ah sub {sub_number} sku".lower()), None)
+
+            if package_col:
+                package_lookup[ah_isbn] = str(map_row.get(package_col, "")).strip()
+            if sku_col:
+                sku_lookup[ah_isbn] = str(map_row.get(sku_col, "")).strip()
+
     # === TEST 1: ActiveHub Package Check ===
-    # Check Pack ID in order list matches Pack ID in mapping CSV
+    # Check Pack ID in order list matches mapping CSV by AH ISBN
     test1_details = []
     test1_passed = True
     test1_mismatches = 0
 
     try:
-        # Check if required columns exist
         order_pack_col = "AH Package 1" if "AH Package 1" in order_df.columns else None
-        mapping_pack_col = "AH Sub 1 Package" if "AH Sub 1 Package" in mapping_df.columns else None
-        isbn_col = "ALDS subscription product ISBN"
+        order_ah_isbn_col = "AH ISBN 1" if "AH ISBN 1" in order_df.columns else None
 
         if not order_pack_col:
             test1_passed = False
             test1_details.append("Order list missing 'AH Package 1' column")
-        elif not mapping_pack_col:
+        elif not order_ah_isbn_col:
             test1_passed = False
-            test1_details.append("Mapping file missing 'AH Sub 1 Package' column")
-        elif isbn_col not in order_df.columns or isbn_col not in mapping_df.columns:
+            test1_details.append("Order list missing 'AH ISBN 1' column")
+        elif not package_lookup:
             test1_passed = False
-            test1_details.append(f"Missing '{isbn_col}' column for matching")
+            test1_details.append("Mapping file missing AH Sub N ISBN/Package pairs")
         else:
-            # Create mapping lookup
-            mapping_lookup = mapping_df.set_index(isbn_col)[mapping_pack_col].to_dict()
-
             for idx, row in order_df.iterrows():
-                order_isbn = str(row.get(isbn_col, "")).strip()
+                order_ah_isbn = normalize_lookup_isbn(row.get(order_ah_isbn_col, ""))
                 order_pack = str(row.get(order_pack_col, "")).strip()
-                expected_pack = str(mapping_lookup.get(order_isbn, "")).strip()
+                expected_pack = str(package_lookup.get(order_ah_isbn, "")).strip()
 
-                if order_isbn and expected_pack and order_pack != expected_pack:
+                if order_ah_isbn and expected_pack and order_pack != expected_pack:
                     test1_mismatches += 1
-                    if test1_mismatches <= 5:  # Show first 5 mismatches
-                        test1_details.append(f"Row {idx+2}: ISBN {order_isbn} has Pack '{order_pack}' but expected '{expected_pack}'")
+                    if test1_mismatches <= 5:
+                        test1_details.append(f"Row {idx+2}: AH ISBN {order_ah_isbn} has Pack '{order_pack}' but expected '{expected_pack}'")
 
             if test1_mismatches > 0:
                 test1_passed = False
@@ -407,72 +431,39 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
     })
 
     # === TEST 2: ActiveHub Subject/SKU Check ===
-    # Check SKU name and number match between order list and mapping
+    # Check SKU IDs match between order list and mapping by AH ISBN
     test2_details = []
     test2_passed = True
     test2_mismatches = 0
 
     try:
-        isbn_col = "ALDS subscription product ISBN"
-        # Check for SKU columns (handle different capitalizations)
+        order_ah_isbn_col = "AH ISBN 1" if "AH ISBN 1" in order_df.columns else None
         order_sku_col = None
-        mapping_sku_col = None
 
         for col in ["AH SKU 1", "AH Sku 1"]:
             if col in order_df.columns:
                 order_sku_col = col
                 break
 
-        for col in ["AH Sub 1 SKU"]:
-            if col in mapping_df.columns:
-                mapping_sku_col = col
-                break
-
-        # SKU name columns
-        order_sku_name_col = None
-        mapping_sku_name_col = None
-
-        for col in ["AH SKU name", "AH SKU 1 name"]:
-            if col in order_df.columns:
-                order_sku_name_col = col
-                break
-
-        for col in ["AH SKU name", "AH Sku name", "AH SKU 1 name"]:
-            if col in mapping_df.columns:
-                mapping_sku_name_col = col
-                break
-
         if not order_sku_col:
             test2_passed = False
             test2_details.append("Order list missing SKU ID column (AH SKU 1)")
-        elif not mapping_sku_col:
+        elif not order_ah_isbn_col:
             test2_passed = False
-            test2_details.append("Mapping file missing SKU column (AH Sub 1 SKU)")
+            test2_details.append("Order list missing AH ISBN column (AH ISBN 1)")
+        elif not sku_lookup:
+            test2_passed = False
+            test2_details.append("Mapping file missing AH Sub N ISBN/SKU pairs")
         else:
-            # Create mapping lookups
-            mapping_sku_lookup = mapping_df.set_index(isbn_col)[mapping_sku_col].to_dict()
-            mapping_sku_name_lookup = {}
-            if mapping_sku_name_col:
-                mapping_sku_name_lookup = mapping_df.set_index(isbn_col)[mapping_sku_name_col].to_dict()
-
             for idx, row in order_df.iterrows():
-                order_isbn = str(row.get(isbn_col, "")).strip()
+                order_ah_isbn = normalize_lookup_isbn(row.get(order_ah_isbn_col, ""))
                 order_sku = str(row.get(order_sku_col, "")).strip()
-                expected_sku = str(mapping_sku_lookup.get(order_isbn, "")).strip()
+                expected_sku = str(sku_lookup.get(order_ah_isbn, "")).strip()
 
-                if order_isbn and expected_sku and order_sku != expected_sku:
+                if order_ah_isbn and expected_sku and order_sku != expected_sku:
                     test2_mismatches += 1
                     if test2_mismatches <= 5:
-                        test2_details.append(f"Row {idx+2}: ISBN {order_isbn} has SKU '{order_sku}' but expected '{expected_sku}'")
-
-                # Also check SKU name if available
-                if order_sku_name_col and mapping_sku_name_col:
-                    order_sku_name = str(row.get(order_sku_name_col, "")).strip()
-                    expected_sku_name = str(mapping_sku_name_lookup.get(order_isbn, "")).strip()
-                    if order_isbn and expected_sku_name and order_sku_name != expected_sku_name:
-                        test2_mismatches += 1
-                        if test2_mismatches <= 5:
-                            test2_details.append(f"Row {idx+2}: SKU name mismatch - got '{order_sku_name}', expected '{expected_sku_name}'")
+                        test2_details.append(f"Row {idx+2}: AH ISBN {order_ah_isbn} has SKU '{order_sku}' but expected '{expected_sku}'")
 
             if test2_mismatches > 0:
                 test2_passed = False
@@ -480,7 +471,7 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
                 if test2_mismatches > 5:
                     test2_details.append(f"...and {test2_mismatches - 5} more mismatches")
             else:
-                test2_details.append(f"All {len(order_df)} orders have correct SKU IDs and names")
+                test2_details.append(f"All {len(order_df)} orders have correct SKU IDs")
     except Exception as e:
         test2_passed = False
         test2_details.append(f"Error during test: {str(e)}")
@@ -682,7 +673,19 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             if match is not None:
                 return match
         return None
-    
+
+    def find_sub_column(df, sub_number, field_name):
+        """Return matching AH Sub N column for a field, preferring non-merge-suffixed columns."""
+        pattern = re.compile(
+            rf"^AH Sub {sub_number} {re.escape(field_name)}(_y)?$",
+            re.IGNORECASE
+        )
+        matches = [col for col in df.columns if pattern.match(str(col).strip())]
+        if not matches:
+            return None
+        non_y = [col for col in matches if not str(col).strip().lower().endswith('_y')]
+        return non_y[0] if non_y else matches[0]
+
     # Normalize ISBN format - convert to consistent string format
     # Handle both integer and float ISBNs, and deal with NaN values
     def normalize_isbn(isbn):
@@ -720,7 +723,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     # Verify Sub ID column exists after merge
     if chunk_num == 1 and 'Sub ID' not in merged_df.columns:
         logging.warning("WARNING: 'Sub ID' column is missing from merged data!")
-    
+
     # Build Model Order List efficiently
     model_order_list = pd.DataFrame()
     
@@ -820,11 +823,59 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     
     # Add pricing and product info
     model_order_list["AH Line 1 Price"] = merged_df["ISBN ExVAT List Price"]
-    model_order_list["AH ISBN 1"] = merged_df["AH Sub 1 ISBN"]
-    model_order_list["AH SKU 1"] = merged_df["AH Sub 1 SKU"]
-    model_order_list["AH Package 1"] = merged_df["AH Sub 1 Package"]
-    if "AH SKU 1 name" in merged_df.columns and "AH SKU name" not in model_order_list.columns:
-        model_order_list["AH SKU name"] = merged_df["AH SKU 1 name"]
+
+    # Expand each merged row into one order row per populated AH Sub N ISBN.
+    sub_isbn_columns = {}
+    for col in merged_df.columns:
+        match = re.match(r"^AH Sub (\d+) ISBN(?:_y)?$", str(col).strip(), re.IGNORECASE)
+        if not match:
+            continue
+        sub_number = int(match.group(1))
+        existing = sub_isbn_columns.get(sub_number)
+        is_merge_suffix = str(col).strip().lower().endswith('_y')
+        if existing is None or (str(existing).strip().lower().endswith('_y') and not is_merge_suffix):
+            sub_isbn_columns[sub_number] = col
+
+    sub_numbers = sorted(sub_isbn_columns) or [1]
+    expanded_rows = []
+
+    for idx in range(len(model_order_list)):
+        base_row = model_order_list.iloc[idx].copy()
+        row_expanded = False
+
+        for sub_number in sub_numbers:
+            isbn_col = sub_isbn_columns.get(sub_number)
+            if isbn_col is None:
+                continue
+
+            sub_isbn = normalize_isbn(merged_df.iloc[idx][isbn_col])
+            if not sub_isbn:
+                continue
+
+            row = base_row.copy()
+            row["AH ISBN 1"] = sub_isbn
+
+            sku_col = find_sub_column(merged_df, sub_number, "SKU")
+            package_col = find_sub_column(merged_df, sub_number, "Package")
+            package_name_col = find_sub_column(merged_df, sub_number, "Package Name")
+
+            row["AH SKU 1"] = merged_df.iloc[idx][sku_col] if sku_col else ""
+            row["AH Package 1"] = merged_df.iloc[idx][package_col] if package_col else ""
+
+            if "AH Sub Package Name" in row.index and package_name_col:
+                row["AH Sub Package Name"] = merged_df.iloc[idx][package_name_col]
+
+            expanded_rows.append(row)
+            row_expanded = True
+
+        if not row_expanded:
+            row = base_row.copy()
+            row["AH ISBN 1"] = normalize_isbn(merged_df.iloc[idx].get("AH Sub 1 ISBN", ""))
+            row["AH SKU 1"] = merged_df.iloc[idx].get("AH Sub 1 SKU", "")
+            row["AH Package 1"] = merged_df.iloc[idx].get("AH Sub 1 Package", "")
+            expanded_rows.append(row)
+
+    model_order_list = pd.DataFrame(expanded_rows)
 
     # Validate rows
     invalid_mask = model_order_list.apply(row_invalid, axis=1)
