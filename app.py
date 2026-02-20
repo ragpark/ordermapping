@@ -90,8 +90,8 @@ def row_invalid(row):
     Checks: School key, School name, Email, Postcode, AH ISBN 1, AH SKU 1, AH Package 1
     """
     # Check Renewal Declined - disabled and allows for Yes and No for Wave 2
-    #if pd.notna(row.get("Renewal Declined")) and str(row["Renewal Declined"]).strip().lower() == "yes":
-    if pd.notna(row.get("Renewal Declined")) and str(row["Renewal Declined"]).strip().lower() in {"yes", "no"}:
+    if pd.notna(row.get("Renewal Declined")) and str(row["Renewal Declined"]).strip().lower() == "yes":
+    #if pd.notna(row.get("Renewal Declined")) and str(row["Renewal Declined"]).strip().lower() in {"yes", "no"}:
         return True
 
     # Check required fields
