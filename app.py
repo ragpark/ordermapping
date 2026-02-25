@@ -833,7 +833,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             "AH Sub 1 Package Name_y",
             "AH Sub 1 Sub Package Name_y"
         ],
-        "AH SKU name": ["AH SKU 1 name", "AH SKU name", "AH Sku name"],
+        "AH SKU name": ["AH SKU name", "AH Sku name", "AH SKU 1 name"],
         "AH Pack name": ["AH Pack name"]
 
     }
@@ -891,6 +891,8 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     # Add pricing and product info
     model_order_list["AH Line 1 Price"] = merged_df["ISBN ExVAT List Price"]
 
+    generic_sku_name_col = find_column(merged_df, ["AH SKU name", "AH Sku name"])
+
     # Expand each merged row into one order row per populated AH Sub N ISBN.
     sub_isbn_columns = {}
     for col in merged_df.columns:
@@ -932,7 +934,12 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             row["AH Package 1"] = merged_df.iloc[idx][package_col] if package_col else ""
 
             if "AH SKU name" in row.index:
-                row["AH SKU name"] = merged_df.iloc[idx][sku_name_col] if sku_name_col else ""
+                if sku_name_col:
+                    row["AH SKU name"] = merged_df.iloc[idx][sku_name_col]
+                elif generic_sku_name_col:
+                    row["AH SKU name"] = merged_df.iloc[idx][generic_sku_name_col]
+                else:
+                    row["AH SKU name"] = ""
             if "AH Pack name" in row.index:
                 row["AH Pack name"] = merged_df.iloc[idx][pack_name_col] if pack_name_col else ""
 
