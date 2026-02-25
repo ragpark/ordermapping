@@ -920,13 +920,13 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             row["AH SKU 1"] = merged_df.iloc[idx][sku_col] if sku_col else ""
             row["AH Package 1"] = merged_df.iloc[idx][package_col] if package_col else ""
 
-            if "AH SKU name" in row.index and sku_name_col:
-                row["AH SKU name"] = merged_df.iloc[idx][sku_name_col]
-            if "AH Pack name" in row.index and pack_name_col:
-                row["AH Pack name"] = merged_df.iloc[idx][pack_name_col]
+            if "AH SKU name" in row.index:
+                row["AH SKU name"] = merged_df.iloc[idx][sku_name_col] if sku_name_col else ""
+            if "AH Pack name" in row.index:
+                row["AH Pack name"] = merged_df.iloc[idx][pack_name_col] if pack_name_col else ""
 
-            if "AH Sub Package Name" in row.index and package_name_col:
-                row["AH Sub Package Name"] = merged_df.iloc[idx][package_name_col]
+            if "AH Sub Package Name" in row.index:
+                row["AH Sub Package Name"] = merged_df.iloc[idx][package_name_col] if package_name_col else ""
 
             expanded_rows.append(row)
             row_expanded = True
