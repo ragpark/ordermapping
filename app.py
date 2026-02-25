@@ -713,6 +713,35 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         non_y = [col for col in matches if not str(col).strip().lower().endswith('_y')]
         return non_y[0] if non_y else matches[0]
 
+    def find_multi_pattern_column(df, patterns):
+        """Return first matching column across patterns, preferring non-merge-suffixed columns."""
+        matches = []
+        for pattern in patterns:
+            matches.extend([
+                col for col in df.columns
+                if pattern.match(str(col).strip())
+            ])
+        if not matches:
+            return None
+        non_y = [col for col in matches if not str(col).strip().lower().endswith('_y')]
+        return non_y[0] if non_y else matches[0]
+
+    def find_sub_sku_name_column(df, sub_number):
+        """Return matching SKU name column for AH Sub N."""
+        patterns = [
+            re.compile(rf"^AH SKU {sub_number} name(_y)?$", re.IGNORECASE),
+            re.compile(rf"^AH Sub {sub_number} SKU name(_y)?$", re.IGNORECASE),
+        ]
+        return find_multi_pattern_column(df, patterns)
+
+    def find_sub_pack_name_column(df, sub_number):
+        """Return matching pack name column for AH Sub N."""
+        patterns = [
+            re.compile(rf"^AH Pack {sub_number} name(_y)?$", re.IGNORECASE),
+            re.compile(rf"^AH Sub {sub_number} Pack name(_y)?$", re.IGNORECASE),
+        ]
+        return find_multi_pattern_column(df, patterns)
+
     # Normalize ISBN format - convert to consistent string format
     # Handle both integer and float ISBNs, and deal with NaN values
     def normalize_isbn(isbn):
@@ -885,9 +914,16 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             sku_col = find_sub_column(merged_df, sub_number, "SKU")
             package_col = find_sub_column(merged_df, sub_number, "Package")
             package_name_col = find_sub_column(merged_df, sub_number, "Package Name")
+            sku_name_col = find_sub_sku_name_column(merged_df, sub_number)
+            pack_name_col = find_sub_pack_name_column(merged_df, sub_number)
 
             row["AH SKU 1"] = merged_df.iloc[idx][sku_col] if sku_col else ""
             row["AH Package 1"] = merged_df.iloc[idx][package_col] if package_col else ""
+
+            if "AH SKU name" in row.index and sku_name_col:
+                row["AH SKU name"] = merged_df.iloc[idx][sku_name_col]
+            if "AH Pack name" in row.index and pack_name_col:
+                row["AH Pack name"] = merged_df.iloc[idx][pack_name_col]
 
             if "AH Sub Package Name" in row.index and package_name_col:
                 row["AH Sub Package Name"] = merged_df.iloc[idx][package_name_col]
