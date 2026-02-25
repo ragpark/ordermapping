@@ -240,9 +240,10 @@ def group_orders_by_subid(df):
         "AH SKU name",   # Standardized SKU name
         "AH Pack name"   # Package name
     ]
-    sub_package_name_cols = sorted(
-        [col for col in df.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
-    )
+    sub_package_name_cols = sorted([
+        col for col in df.columns
+        if re.match(r"^AH Sub \d+ (?:Sub )?Package Name$", col)
+    ])
     possible_order_cols.extend(sub_package_name_cols)
     if "AH Sub Package Name" in df.columns:
         possible_order_cols.append("AH Sub Package Name")
@@ -742,6 +743,14 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         ]
         return find_multi_pattern_column(df, patterns)
 
+    def find_sub_package_name_column(df, sub_number):
+        """Return matching sub package name column for AH Sub N."""
+        patterns = [
+            re.compile(rf"^AH Sub {sub_number} Sub Package Name(_y)?$", re.IGNORECASE),
+            re.compile(rf"^AH Sub {sub_number} Package Name(_y)?$", re.IGNORECASE),
+        ]
+        return find_multi_pattern_column(df, patterns)
+
     # Normalize ISBN format - convert to consistent string format
     # Handle both integer and float ISBNs, and deal with NaN values
     def normalize_isbn(isbn):
@@ -790,15 +799,16 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         logging.warning(f"Chunk {chunk_num}: 'Sub ID' column missing from raw data - grouping will not be available")
     
     def add_sub_package_name_columns():
-        pattern = re.compile(r"^ah sub (\d+) package name(_y)?$", re.IGNORECASE)
+        pattern = re.compile(r"^ah sub (\d+) (sub )?package name(_y)?$", re.IGNORECASE)
         normalized_map = {}
         for col in merged_df.columns:
             match = pattern.match(str(col).strip())
             if not match:
                 continue
             number = match.group(1)
-            normalized_col = f"AH Sub {number} Package Name"
-            is_merge_suffix = match.group(2) is not None
+            is_sub_package = match.group(2) is not None
+            normalized_col = f"AH Sub {number} {'Sub ' if is_sub_package else ''}Package Name"
+            is_merge_suffix = match.group(3) is not None
             if normalized_col not in normalized_map or not is_merge_suffix:
                 normalized_map[normalized_col] = col
         for normalized_col, source_col in normalized_map.items():
@@ -838,9 +848,10 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
     
     # Log which mapping columns were found
     if chunk_num == 1:
-        sub_package_name_cols = sorted(
-            [col for col in model_order_list.columns if re.match(r"^AH Sub \d+ Package Name$", col)]
-        )
+        sub_package_name_cols = sorted([
+            col for col in model_order_list.columns
+            if re.match(r"^AH Sub \d+ (?:Sub )?Package Name$", col)
+        ])
         debug_col_aliases = {
             "AH Sub Package Name": [
                 "AH Sub Package Name",
@@ -913,7 +924,7 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
 
             sku_col = find_sub_column(merged_df, sub_number, "SKU")
             package_col = find_sub_column(merged_df, sub_number, "Package")
-            package_name_col = find_sub_column(merged_df, sub_number, "Package Name")
+            package_name_col = find_sub_package_name_column(merged_df, sub_number)
             sku_name_col = find_sub_sku_name_column(merged_df, sub_number)
             pack_name_col = find_sub_pack_name_column(merged_df, sub_number)
 
