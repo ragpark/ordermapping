@@ -271,8 +271,34 @@ def group_orders_by_subid(df):
     agg_funcs = {col: "first" for col in common_cols if col in df_copy.columns}
     common_df = df_copy.groupby("Sub ID").agg(agg_funcs)
 
-    # Merge and return
+    # Merge grouped data
     grouped_df = common_df.merge(pivot_df, left_index=True, right_index=True).reset_index()
+
+    # Split AH Line 1 Price equally across products when a grouped row contains
+    # more than one populated product. This keeps the grouped row total aligned
+    # with mapping "ISBN ExVAT List Price".
+    price_cols = {}
+    for col in grouped_df.columns:
+        match = re.match(r"^AH Line 1 Price_(\d+)$", str(col).strip(), re.IGNORECASE)
+        if match:
+            price_cols[int(match.group(1))] = col
+
+    if price_cols:
+        for idx, row in grouped_df.iterrows():
+            product_numbers = [
+                order_num for order_num in sorted(price_cols)
+                if str(row.get(f"AH ISBN 1_{order_num}", "")).strip() != ""
+            ]
+
+            product_count = len(product_numbers)
+            if product_count <= 1:
+                continue
+
+            for order_num in product_numbers:
+                price_col = price_cols[order_num]
+                price_val = pd.to_numeric(row.get(price_col), errors="coerce")
+                if pd.notna(price_val):
+                    grouped_df.at[idx, price_col] = round(float(price_val) / product_count, 2)
     
     # Log final columns
     logging.info(f"Final grouped columns count: {len(grouped_df.columns)}")
