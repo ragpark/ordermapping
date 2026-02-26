@@ -1,5 +1,6 @@
 import os
 import re
+from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
 import logging
 import sys
 from datetime import datetime
@@ -582,7 +583,9 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
     })
 
     # === TEST 5: Price Consistency Check ===
-    # Check order list price matches mapping list price
+    # Check order list price matches mapping rules:
+    # - single populated AH Sub ISBN: ISBN ExVAT List Price
+    # - multiple populated AH Sub ISBNs: ISBN ExVAT List Price / product count (banker's rounding)
     test5_details = []
     test5_passed = True
     price_mismatches = 0
@@ -602,24 +605,56 @@ def run_all_tests(mapping_csv_path, model_order_list_csv_path):
             test5_passed = False
             test5_details.append(f"Mapping file missing '{isbn_col}' column")
         else:
-            # Create price lookup
-            mapping_price_lookup = mapping_df.set_index(isbn_col)[mapping_price_col].to_dict()
+            sub_isbn_cols = [
+                col for col in mapping_df.columns
+                if re.match(r"^AH Sub \d+ ISBN$", str(col).strip(), re.IGNORECASE)
+            ]
+
+            def bankers_round(value, places=2):
+                try:
+                    dec = Decimal(str(value))
+                except (InvalidOperation, ValueError, TypeError):
+                    return None
+                quant = Decimal("1").scaleb(-places)
+                return float(dec.quantize(quant, rounding=ROUND_HALF_EVEN))
+
+            price_lookup = {}
+            for _, mrow in mapping_df.iterrows():
+                key = str(mrow.get(isbn_col, "")).strip()
+                if not key:
+                    continue
+
+                base_price = pd.to_numeric(mrow.get(mapping_price_col), errors="coerce")
+                if pd.isna(base_price):
+                    continue
+
+                populated = 0
+                for sub_col in sub_isbn_cols:
+                    try:
+                        raw = mrow.get(sub_col, "")
+                    except Exception:
+                        raw = ""
+                    if str(raw).strip() and str(raw).strip().lower() != "nan":
+                        populated += 1
+
+                expected = bankers_round(float(base_price) / populated, 2) if populated > 1 else bankers_round(float(base_price), 2)
+                if expected is not None:
+                    price_lookup[key] = expected
 
             for idx, row in order_df.iterrows():
                 order_isbn = str(row.get(isbn_col, "")).strip()
 
                 try:
                     order_price = float(row.get(order_price_col, 0)) if pd.notna(row.get(order_price_col)) else None
-                    expected_price = float(mapping_price_lookup.get(order_isbn, 0)) if order_isbn in mapping_price_lookup else None
+                    expected_price = price_lookup.get(order_isbn)
 
                     if order_price is not None and expected_price is not None:
-                        # Compare with tolerance for floating point
                         if abs(order_price - expected_price) > 0.01:
                             price_mismatches += 1
                             if price_mismatches <= 5:
                                 test5_details.append(f"Row {idx+2}: ISBN {order_isbn} has price {order_price:.2f} but expected {expected_price:.2f}")
                 except (ValueError, TypeError):
-                    pass  # Skip rows with non-numeric prices
+                    pass
 
             if price_mismatches > 0:
                 test5_passed = False
@@ -866,10 +901,17 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
         reordered_cols.insert(school_name_index + 1, "School key")
         model_order_list = model_order_list[reordered_cols]
     
-    # Add pricing and product info
-    model_order_list["AH Line 1 Price"] = merged_df["ISBN ExVAT List Price"]
-
+    # Add product info (price is assigned per expanded sub-row)
     generic_sku_name_col = find_column(merged_df, ["AH SKU name", "AH Sku name"])
+
+    def bankers_round(value, places=2):
+        """Round using bank's rounding (ROUND_HALF_EVEN)."""
+        try:
+            dec = Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return ""
+        quant = Decimal("1").scaleb(-places)
+        return float(dec.quantize(quant, rounding=ROUND_HALF_EVEN))
 
     # Expand each merged row into one order row per populated AH Sub N ISBN.
     sub_isbn_columns = {}
@@ -902,6 +944,26 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             row = base_row.copy()
             row["AH ISBN 1"] = sub_isbn
 
+            # Determine per-product price: if multiple AH Sub ISBNs are populated,
+            # divide ISBN ExVAT List Price equally using banker's rounding.
+            populated_sub_count = 0
+            for candidate_sub in sub_numbers:
+                candidate_col = sub_isbn_columns.get(candidate_sub)
+                if candidate_col is None:
+                    continue
+                if normalize_isbn(merged_df.iloc[idx][candidate_col]):
+                    populated_sub_count += 1
+
+            list_price = merged_df.iloc[idx].get("ISBN ExVAT List Price", "")
+            numeric_list_price = pd.to_numeric(list_price, errors="coerce")
+            if pd.notna(numeric_list_price):
+                if populated_sub_count > 1:
+                    row["AH Line 1 Price"] = bankers_round(float(numeric_list_price) / populated_sub_count, 2)
+                else:
+                    row["AH Line 1 Price"] = bankers_round(float(numeric_list_price), 2)
+            else:
+                row["AH Line 1 Price"] = ""
+
             sku_col = find_sub_column(merged_df, sub_number, "SKU")
             package_col = find_sub_column(merged_df, sub_number, "Package")
             package_name_col = find_sub_package_name_column(merged_df, sub_number)
@@ -932,6 +994,8 @@ def process_chunk(chunk_df, mapping_df, chunk_num):
             row["AH ISBN 1"] = normalize_isbn(merged_df.iloc[idx].get("AH Sub 1 ISBN", ""))
             row["AH SKU 1"] = merged_df.iloc[idx].get("AH Sub 1 SKU", "")
             row["AH Package 1"] = merged_df.iloc[idx].get("AH Sub 1 Package", "")
+            fallback_price = pd.to_numeric(merged_df.iloc[idx].get("ISBN ExVAT List Price", ""), errors="coerce")
+            row["AH Line 1 Price"] = bankers_round(float(fallback_price), 2) if pd.notna(fallback_price) else ""
             expanded_rows.append(row)
 
     model_order_list = pd.DataFrame(expanded_rows)
